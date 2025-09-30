@@ -18,8 +18,15 @@ import {
 import { COLLECTIONS, UserDoc, UserRole } from "./models";
 
 // Sign in existing user
+function assertFirebase() {
+  if (!auth || !db) {
+    throw new Error("Firebase not initialized. Ensure env vars are set and firebase is configured.");
+  }
+}
+
 export async function signIn(email: string, password: string) {
-  const cred = await signInWithEmailAndPassword(auth, email, password);
+  assertFirebase();
+  const cred = await signInWithEmailAndPassword(auth!, email, password);
   return cred.user;
 }
 
@@ -32,8 +39,9 @@ export interface CreateUserAccountParams {
 }
 
 export async function createUserAccount(params: CreateUserAccountParams) {
+  assertFirebase();
   const { email, password, displayName, role = "cashier" } = params;
-  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  const cred = await createUserWithEmailAndPassword(auth!, email, password);
   if (displayName) {
     await updateProfile(cred.user, { displayName });
   }
@@ -42,16 +50,19 @@ export async function createUserAccount(params: CreateUserAccountParams) {
 }
 
 export async function signOut() {
-  await fbSignOut(auth);
+  assertFirebase();
+  await fbSignOut(auth!);
 }
 
 export function listenToAuthState(cb: (user: FirebaseUser | null) => void) {
-  const unsub = onAuthStateChanged(auth, (u) => cb(u));
+  assertFirebase();
+  const unsub = onAuthStateChanged(auth!, (u) => cb(u));
   return unsub;
 }
 
 export async function getUserDoc(uid: string): Promise<UserDoc | null> {
-  const ref = doc(db, COLLECTIONS.users, uid);
+  assertFirebase();
+  const ref = doc(db!, COLLECTIONS.users, uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
   const data = snap.data() as Partial<UserDoc> & Record<string, unknown>;
@@ -69,7 +80,8 @@ export async function getUserDoc(uid: string): Promise<UserDoc | null> {
 }
 
 export async function ensureUserDocument(user: FirebaseUser, role: UserRole = "cashier") {
-  const ref = doc(db, COLLECTIONS.users, user.uid);
+  assertFirebase();
+  const ref = doc(db!, COLLECTIONS.users, user.uid);
   const existing = await getDoc(ref);
   if (!existing.exists()) {
     const now = new Date().toISOString();

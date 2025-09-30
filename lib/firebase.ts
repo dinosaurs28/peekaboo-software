@@ -24,6 +24,6 @@ if (shouldInit) {
   }
 }
 
-export const auth = app ? getAuth(app) : (undefined as any);
-export const db = app ? getFirestore(app) : (undefined as any);
-export const storage = app ? getStorage(app) : (undefined as any);
+export const auth: ReturnType<typeof getAuth> | undefined = app ? getAuth(app) : undefined;
+export const db: ReturnType<typeof getFirestore> | undefined = app ? getFirestore(app) : undefined;
+export const storage: ReturnType<typeof getStorage> | undefined = app ? getStorage(app) : undefined;
