@@ -134,6 +134,79 @@ Timestamps:
 
 To be added: Firestore security rules enforcing role-based access (admin vs cashier) for write operations on sensitive collections (Products, Offers, Settings, Users) and limiting cashier rights to creating invoices, updating customer basics, reading products.
 
+### Testing Guide
+
+This project currently emphasizes manual verification (no automated tests yet). Use the following checklist after pulling new changes or configuring a new environment.
+
+#### 1. Environment Setup
+1. Copy env file: `cp .env.local.example .env.local` (PowerShell: `Copy-Item .env.local.example .env.local`).
+2. Fill Firebase values (Web App config). Ensure API key is valid.
+3. Run `npm install`.
+4. Start dev server: `npm run dev`.
+5. Confirm no startup errors in terminal.
+
+#### 2. Lint & Build
+| Task | Command | Expected |
+|------|---------|----------|
+| Lint | `npm run lint` | 0 errors (warnings allowed) |
+| Build | `npm run build` | Successful build, static pages generated |
+
+#### 3. Authentication Flow
+| Step | Expectation |
+|------|-------------|
+| Visit `/` (dashboard) unauthenticated | Redirect or empty (if not signed in). Use `/ (auth)/login` directly if needed. |
+| Open `/ (auth)/login` | Login form renders (email, password, sign-in button) |
+| Sign in with valid user | Redirects to `/dashboard` (root) and shows user email placeholder in sidebar footer |
+| Sign out (Dashboard button) | Returns to login page |
+
+If first user doc missing: After first successful login, Firestore should contain `Users/{uid}` with default role `cashier`.
+
+#### 4. Dashboard UI Verification
+| Element | Check |
+|---------|-------|
+| Sidebar | Contains nav: Dashboard, Customers, Invoices, Payments, Reports, Settings |
+| Topbar | Search input, bell icon, avatar present |
+| Stat Cards | Exactly 4 cards with metrics & icons (revenue, pending payments, new customers, overdue invoices) |
+| Recent Invoices Table | 3 sample rows with correct status badge colors (green Paid, amber Pending) |
+
+#### 5. Role Placeholder
+Currently roles (`admin` vs `cashier`) do not change UI significantly. Confirm `role` field is set in Firestore; manual change to `admin` should show placeholder "Admin Action" button on `/dashboard` page (from earlier page variant). If not visible, that feature may have been superseded by new dashboard root rendering — future enhancement.
+
+#### 6. Firebase Initialization Guard
+| Scenario | Expected |
+|----------|----------|
+| Missing env vars & run `npm run build` | Build still succeeds (firebase guarded) |
+| With env vars populated | Firebase initializes, auth works |
+
+#### 7. Data Models Sanity
+Open `lib/models.ts` and confirm all collection constants match intended Firestore collections. Adding a document manually in Firestore (e.g., Products) should reflect expected fields.
+
+#### 8. Basic Smoke Script (Optional)
+In the browser console after login, you can verify auth object:
+```js
+// Should show current user UID
+firebase?.auth?.currentUser?.uid
+```
+(If using modular imports only, rely on the application UI; we have not exposed firebase globally.)
+
+#### 9. Accessibility Quick Checks
+| Check | Expectation |
+|-------|-------------|
+| Tab navigation | Can reach buttons & links |
+| Contrast | Text readable on light/dark (toggle dark by adding `class="dark"` on `<html>`) |
+
+#### 10. Future Automated Testing (Planned)
+- Add Jest/Vitest + React Testing Library for component & auth-mocking.
+- Cypress/Playwright for login & dashboard flows.
+
+### Troubleshooting
+| Issue | Possible Cause | Fix |
+|-------|----------------|-----|
+| auth/invalid-api-key | Missing/incorrect env vars | Update `.env.local` values from Firebase console |
+| Build fails on firebase import | Guard not applied or edited | Ensure `lib/firebase.ts` still checks `shouldInit` before initializeApp |
+| Dashboard blank after login | Auth provider not mounting | Check `app/layout.tsx` wraps children in `<AuthProvider>` |
+| Styling missing | Tailwind not picking up content | Confirm `tailwind.config.ts` content globs include `components`, `app`, `lib` |
+
 ### License
 
 Private / Proprietary – All rights reserved.
