@@ -83,6 +83,57 @@ npx shadcn-ui add alert-dialog
 6. Role-based permissions
 7. Offline-friendly cart (IndexedDB) & optimistic updates
 
+### Authentication
+
+Implemented basic email/password authentication using Firebase Auth.
+
+Roles:
+- `admin` – Full access, can manage users, products, settings.
+- `cashier` – Restricted to POS, invoices, customers, product lookup.
+
+Role Storage:
+- Stored in Firestore under `Users/{uid}` document field `role`.
+- On first login, `ensureUserDocument` creates a user record with a default `cashier` role (adjust later via admin UI or security rules).
+
+Provider:
+- `AuthProvider` (in `components/auth/auth-provider.tsx`) wraps the app in `app/layout.tsx`.
+- Hook `useAuth()` exposes `{ user, role, loading }`.
+
+Login Flow:
+- Visit `/ (auth)/login` (path: `app/(auth)/login/page.tsx`).
+- On success redirects to `/dashboard`.
+
+Protected Page Example:
+- `app/dashboard/page.tsx` redirects to login if not authenticated.
+
+Sign Out:
+- Button on dashboard triggers `signOut()`.
+
+### Data Models
+
+Defined in `lib/models.ts` with TypeScript interfaces:
+
+Collections:
+- `Users` (UserDoc) – authUid, email, role, active, timestamps.
+- `Customers` (CustomerDoc) – name, contact info, loyalty, spend.
+- `Products` (ProductDoc) – sku, stock, pricing, tax, reorder level.
+- `Invoices` (InvoiceDoc) – line items, payments, totals, status.
+- `Offers` (OfferDoc) – discounts, active window, targeting products.
+- `InventoryLogs` (InventoryLogDoc) – stock movement audit trail.
+- `Barcodes` (BarcodeDoc) – code mapping to product.
+- `Reports` (ReportDoc) – cached generated analytics snapshots.
+- `Settings` (SettingsDoc) – business-wide configuration.
+
+Constants:
+- `COLLECTIONS` object ensures consistent naming.
+
+Timestamps:
+- Stored as ISO strings in interfaces; Firestore writes use `serverTimestamp()` where applicable (conversion layer can be added later).
+
+### Security & Rules (Planned)
+
+To be added: Firestore security rules enforcing role-based access (admin vs cashier) for write operations on sensitive collections (Products, Offers, Settings, Users) and limiting cashier rights to creating invoices, updating customer basics, reading products.
+
 ### License
 
 Private / Proprietary – All rights reserved.
