@@ -100,14 +100,15 @@ Provider:
 - Hook `useAuth()` exposes `{ user, role, loading }`.
 
 Login Flow:
-- Visit `/ (auth)/login` (path: `app/(auth)/login/page.tsx`).
+- Visit `/login` (path: `app/(auth)/login/page.tsx`).
 - On success redirects to `/dashboard`.
 
-Protected Page Example:
-- `app/dashboard/page.tsx` redirects to login if not authenticated.
+Protected Pages:
+- `/dashboard` (canonical dashboard). Root `/` redirects to `/dashboard`.
+- Unauthenticated access to `/dashboard` redirects to `/login`.
 
 Sign Out:
-- Button on dashboard triggers `signOut()`.
+- Topbar avatar menu → Sign out.
 
 ### Data Models
 
@@ -154,10 +155,11 @@ This project currently emphasizes manual verification (no automated tests yet). 
 #### 3. Authentication Flow
 | Step | Expectation |
 |------|-------------|
-| Visit `/` (dashboard) unauthenticated | Redirect or empty (if not signed in). Use `/ (auth)/login` directly if needed. |
-| Open `/ (auth)/login` | Login form renders (email, password, sign-in button) |
-| Sign in with valid user | Redirects to `/dashboard` (root) and shows user email placeholder in sidebar footer |
-| Sign out (Dashboard button) | Returns to login page |
+| Visit `/` | Redirects to `/dashboard` |
+| Visit `/dashboard` unauthenticated | Redirects to `/login` |
+| Open `/login` | Login form renders (email, password, sign-in button) |
+| Sign in with valid user | Redirects to `/dashboard` |
+| Sign out (Topbar menu) | Returns to `/login` |
 
 If first user doc missing: After first successful login, Firestore should contain `Users/{uid}` with default role `cashier`.
 
@@ -165,7 +167,7 @@ If first user doc missing: After first successful login, Firestore should contai
 | Element | Check |
 |---------|-------|
 | Sidebar | Contains nav: Dashboard, Customers, Invoices, Payments, Reports, Settings |
-| Topbar | Search input, bell icon, avatar present |
+| Topbar | Search input, bell icon, avatar with sign-out menu |
 | Stat Cards | Exactly 4 cards with metrics & icons (revenue, pending payments, new customers, overdue invoices) |
 | Recent Invoices Table | 3 sample rows with correct status badge colors (green Paid, amber Pending) |
 
@@ -210,3 +212,98 @@ firebase?.auth?.currentUser?.uid
 ### License
 
 Private / Proprietary – All rights reserved.
+
+## TODO
+1. Once auth is confirmed make this change in firebase rules - 
+allow read, write: if request.auth != null;
+Phase 2: Product & Inventory (Day 4–7)
+
+Deliverables:
+
+Product CRUD (Add/Edit/Delete, SKU, HSN Code, Pricing, GST)
+
+Categories for products (Toys, Clothes, Books, etc.)
+
+Inventory tracking (real-time stock deduction)
+
+Low stock alerts (dashboard + notifications)
+
+Barcode Generator (Admin Only)
+
+Generate barcodes (single + bulk)
+
+Export PDF for label printing
+
+✅ Output: Admin can set up catalog, generate barcodes, and stock system is live.
+
+🔹 Phase 3: POS & Billing (Day 8–12)
+
+Deliverables:
+
+POS UI (fast product search: name/barcode)
+
+Add multiple items to cart
+
+Discounts (item-level + bill-level)
+
+Tax handling (GST slab calculation)
+
+Invoice generation (printable + downloadable PDF, email option)
+
+Multi-payment support (Cash, UPI, Card, Wallet)
+
+Split payment support
+
+✅ Output: Cashiers can complete sales smoothly with invoices generated.
+
+🔹 Phase 4: Customer & Offers (Day 13–16)
+
+Deliverables:
+
+Customer CRUD (name, phone, email, DOB)
+
+Customer purchase history tracking
+
+Personalized Offers Module
+
+Event/Fest-based offers (Diwali, Back-to-School, etc.)
+
+DOB-based offers (Birthday month alerts at POS)
+
+Offer rules engine (% off, flat off, BOGO)
+
+POS auto-alert for active offers
+
+✅ Output: Store can engage customers with special offers & capture loyalty.
+
+🔹 Phase 5: Reports & Accounting (Day 17–19)
+
+Deliverables:
+
+Daily/Weekly/Monthly Sales Reports
+
+Stock Report
+
+Payment Mode Report
+
+Accounting-friendly export (CSV/XLSX) with:
+
+Date, Invoice No., SKU, HSN, Tax, Discounts, Payment Mode, Customer ID
+
+Export filters (date range, category, payment mode)
+
+✅ Output: Store can generate reports that plug directly into accounting software.
+
+🔹 Phase 6: Polish & Integrations (Day 20–21)
+
+Deliverables:
+
+UI refinements (mobile-first POS & dashboard views)
+
+Invoice template customization (store branding)
+
+Final security & role permission check
+
+Seed demo data for testing
+
+✅ Output: Complete app feature-ready for testing cycle.

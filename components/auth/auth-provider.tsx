@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { listenToAuthState, ensureUserDocument, getUserRole } from "@/lib/auth";
 import { User as FirebaseUser } from "firebase/auth";
 import { UserRole } from "@/lib/models";
+import { auth as firebaseAuth } from "@/lib/firebase";
 
 interface AuthContextValue {
   user: FirebaseUser | null;
@@ -18,13 +19,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!firebaseAuth) {
+      // Firebase not initialized; skip auth wiring but render app
+      setLoading(false);
+      return;
+    }
     const unsub = listenToAuthState(async (u) => {
       setUser(u);
       if (u) {
-        // Ensure user doc exists, then fetch role
-        await ensureUserDocument(u);
-        const r = await getUserRole(u.uid);
-        setRole(r);
+        try {
+          // Ensure user doc exists, then fetch role
+          await ensureUserDocument(u);
+          const r = await getUserRole(u.uid);
+          setRole(r);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error("Failed to ensure user document or get role:", err);
+          setRole(null);
+        }
       } else {
         setRole(null);
       }

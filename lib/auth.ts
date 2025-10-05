@@ -85,17 +85,26 @@ export async function ensureUserDocument(user: FirebaseUser, role: UserRole = "c
   const existing = await getDoc(ref);
   if (!existing.exists()) {
     const now = new Date().toISOString();
-    const docData: Omit<UserDoc, "id"> = {
+    // Build data without undefined fields (Firestore rejects undefined)
+    const base: Omit<UserDoc, "id"> = {
       authUid: user.uid,
       email: user.email || "",
-      displayName: user.displayName || undefined,
       role,
       active: true,
       createdAt: now,
       updatedAt: now,
       lastLoginAt: now,
     };
-    await setDoc(ref, { ...docData, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), lastLoginAt: serverTimestamp() });
+    const withOptional = {
+      ...base,
+      ...(user.displayName ? { displayName: user.displayName } : {}),
+    } satisfies Partial<Omit<UserDoc, "id">>;
+    await setDoc(ref, {
+      ...withOptional,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      lastLoginAt: serverTimestamp(),
+    });
   } else {
     await updateDoc(ref, { lastLoginAt: serverTimestamp(), updatedAt: serverTimestamp() });
   }

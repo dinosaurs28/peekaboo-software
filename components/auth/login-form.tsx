@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { signIn } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FirebaseError } from "firebase/app";
 
 interface Props {
   redirectTo?: string;
@@ -26,7 +27,28 @@ export const LoginForm: React.FC<Props> = ({ redirectTo = "/dashboard" }) => {
       await signIn(email, password);
       window.location.href = redirectTo;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Login failed";
+      let message = err instanceof Error ? err.message : "Login failed";
+      if (err instanceof FirebaseError) {
+        switch (err.code) {
+          case "auth/configuration-not-found":
+          case "auth/operation-not-allowed":
+            message = "Email/Password sign-in is not enabled for this Firebase project. In Firebase Console → Authentication, click 'Get started' and enable Email/Password.";
+            break;
+          case "auth/user-not-found":
+            message = "No account found for this email. Create a user in Firebase Console → Authentication → Users, then try again.";
+            break;
+          case "auth/wrong-password":
+          case "auth/invalid-credential":
+            message = "Incorrect email or password. Please try again.";
+            break;
+          case "auth/too-many-requests":
+            message = "Too many attempts. Please wait a minute and try again.";
+            break;
+          case "auth/network-request-failed":
+            message = "Network error. Check your connection and try again.";
+            break;
+        }
+      }
       setError(message);
     } finally {
       setLoading(false);
