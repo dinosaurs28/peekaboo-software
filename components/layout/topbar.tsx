@@ -4,20 +4,55 @@ import { Input } from "@/components/ui/input";
 import { Bell } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { signOut } from "@/lib/auth";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { observeLowStockProducts } from "@/lib/products";
+import type { ProductDoc } from "@/lib/models";
+import Link from "next/link";
 
 export function Topbar() {
   const { user, role } = useAuth();
   const [open, setOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [lowCount, setLowCount] = useState(0);
+  const [lowItems, setLowItems] = useState<ProductDoc[]>([]);
+  const notifRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (role !== "admin") return;
-    const unsub = observeLowStockProducts((items) => setLowCount(items.length));
+    // Subscribe for everyone so the dropdown lists items; badge may still be admin-only
+    const unsub = observeLowStockProducts((items) => {
+      setLowItems(items);
+      setLowCount(items.length);
+    });
     return () => unsub && unsub();
-  }, [role]);
+  }, []);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!notifRef.current) return;
+      if (!notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    if (notifOpen) {
+      document.addEventListener("mousedown", onDocClick);
+      return () => document.removeEventListener("mousedown", onDocClick);
+    }
+  }, [notifOpen]);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", onDocClick);
+      return () => document.removeEventListener("mousedown", onDocClick);
+    }
+  }, [open]);
 
   function handleSignOut() {
     signOut().finally(() => {
@@ -32,20 +67,63 @@ export function Topbar() {
           <Input placeholder="Search..." className="pl-4" />
         </div>
       </div>
-      <button className="relative rounded-full p-2 hover:bg-muted text-muted-foreground" aria-label="Notifications">
-        <Bell className="h-5 w-5" />
-        {role === "admin" && lowCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] leading-4 text-center">
-            {lowCount}
-          </span>
+      <div className="relative" ref={notifRef}>
+        <button
+          className="relative rounded-full p-2 hover:bg-muted text-muted-foreground"
+          aria-label="Notifications"
+          onClick={() => setNotifOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={notifOpen}
+        >
+          <Bell className="h-5 w-5" />
+          {role === "admin" && lowCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] leading-4 text-center">
+              {lowCount}
+            </span>
+          )}
+        </button>
+        {notifOpen && (
+          <div className="absolute right-0 mt-2 w-80 rounded-md border bg-background text-foreground shadow-lg z-20 bg-white dark:bg-neutral-900 backdrop-blur-0">
+            <div className="px-3 py-2 border-b text-sm font-medium">Notifications</div>
+            <div className="max-h-72 overflow-auto p-2">
+              {lowItems.length === 0 ? (
+                <div className="text-xs text-muted-foreground px-2 py-4">No low stock items.</div>
+              ) : (
+                <ul className="space-y-2">
+                  {lowItems.map((p) => (
+                    <li key={p.id} className="flex items-start justify-between gap-2 text-sm">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{p.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">SKU {p.sku} • Stock {p.stock}{p.reorderLevel != null ? ` / ≤ ${p.reorderLevel}` : ''}</div>
+                      </div>
+                      <div className="shrink-0">
+                        {role === "admin" ? (
+                          <Link href={`/products/${p.id}`}>
+                            <Button size="sm" variant="outline">View</Button>
+                          </Link>
+                        ) : (
+                          <Link href={`/products`}>
+                            <Button size="sm" variant="outline">View</Button>
+                          </Link>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="p-2 border-t text-right">
+              <Link href="/products"><Button size="sm" variant="ghost">View all</Button></Link>
+            </div>
+          </div>
         )}
-      </button>
-      <div className="relative">
+      </div>
+      <div className="relative" ref={menuRef}>
         <button onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} className="rounded-full">
           <Avatar fallback={(user?.email?.[0] || "").toUpperCase() || "U"} />
         </button>
         {open && (
-          <div className="absolute right-0 mt-2 w-40 rounded-md border bg-popover text-popover-foreground shadow-md z-10">
+          <div className="absolute right-0 mt-2 w-40 rounded-md border bg-background text-foreground shadow-lg z-20 bg-white dark:bg-neutral-900 backdrop-blur-0">
             <div className="px-3 py-2 text-xs text-muted-foreground border-b">
               {user?.email || "Signed in"}
             </div>

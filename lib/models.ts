@@ -39,6 +39,7 @@ export interface ProductDoc extends BaseDoc {
   reorderLevel?: number; // threshold for low-stock alerts
   taxRatePct?: number; // e.g. 5 for 5%
   active: boolean;
+  printedCount?: number; // number of barcode labels printed
 }
 
 export interface InvoiceLineItem {
@@ -141,3 +142,10 @@ export const CATEGORY_OPTIONS = [
   'Accessories',
   'Electronics',
 ] as const;
+
+export function categoryCode(cat?: string): string {
+  if (!cat) return 'GEN';
+  const trimmed = cat.trim();
+  if (!trimmed) return 'GEN';
+  return trimmed.slice(0, 3).toUpperCase();
+}
