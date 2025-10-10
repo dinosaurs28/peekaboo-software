@@ -103,6 +103,9 @@ export default function BarcodeGeneratorPage() {
       JsBarcode(tempCanvas, code, { format: "CODE128", displayValue: false, margin: 0, height: 28 });
       const imgData = tempCanvas.toDataURL("image/png");
 
+      // Consistent inner horizontal padding (mm) within each label
+      const PAD_X = 4; // left/right padding inside label
+
       const labelPerPage = spec.cols * spec.rows;
       const total = Math.max(1, Math.min(300, Math.floor(qty)));
       for (let i = 0; i < total; i++) {
@@ -116,27 +119,33 @@ export default function BarcodeGeneratorPage() {
         const x = spec.marginX + col * (spec.labelW + spec.gapX);
         const y = spec.marginY + row * (spec.labelH + spec.gapY);
 
-        // Text: product name (truncate)
+        // Text: product name (truncate) aligned with barcode inner padding
         doc.setFontSize(9);
         const name = selected.name.length > 28 ? selected.name.slice(0, 25) + "…" : selected.name;
-        doc.text(name, x + 2, y + 5, { maxWidth: spec.labelW - 4 });
+        doc.text(name, x + PAD_X, y + 5, { maxWidth: spec.labelW - PAD_X * 2 });
 
-        // Barcode image centered (reduced height to leave room for text)
-        const imgW = spec.labelW - 4;
+        // Barcode image with fixed inner padding and reduced width to keep spacing stable
+        const imgW = spec.labelW - PAD_X * 2;
         const imgH = 12;
-        const imgX = x + (spec.labelW - imgW) / 2;
+        const imgX = x + PAD_X;
         const imgY = y + 7;
         doc.addImage(imgData, "PNG", imgX, imgY, imgW, imgH, undefined, "FAST");
 
-        // Bottom text on two lines to avoid overlap: price above, code below
+        // Bottom text strictly below the barcode at imgBottom + 6mm for both lines
         const priceText = `₹${selected.unitPrice.toFixed(2)}`;
-        doc.setFontSize(8);
-        doc.text(priceText, x + spec.labelW - 2, y + spec.labelH - 8, { align: "right" });
+        const textY = imgY + imgH + 6; // desired baseline below barcode
 
-        // Code string below barcode; small font, no wrapping
+        // Clamp within label height
+        const maxTextY = y + spec.labelH - 2;
+        const adjTextY = Math.min(textY, maxTextY);
+
+        // Price (right aligned) and code (left aligned) on the same baseline using inner paddings
+        doc.setFontSize(7); // slightly smaller to prevent crowding
+        doc.text(priceText, x + spec.labelW - PAD_X, adjTextY, { align: "right" });
+
         const codeText = code;
         doc.setFontSize(7);
-        doc.text(codeText, x + 2, y + spec.labelH - 3);
+        doc.text(codeText, x + PAD_X, adjTextY);
       }
 
       doc.save(`barcodes_${selected.sku}_${Date.now()}.pdf`);
