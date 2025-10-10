@@ -99,8 +99,8 @@ export default function BarcodeGeneratorPage() {
 
       // Pre-render barcode to canvas to get image data
       const tempCanvas = document.createElement("canvas");
-  // For PDF, render bars only (no human-readable text) to avoid duplication
-  JsBarcode(tempCanvas, code, { format: "CODE128", displayValue: false, margin: 0, height: 28 });
+      // For PDF, render bars only (no human-readable text) to avoid duplication
+      JsBarcode(tempCanvas, code, { format: "CODE128", displayValue: false, margin: 0, height: 28 });
       const imgData = tempCanvas.toDataURL("image/png");
 
       const labelPerPage = spec.cols * spec.rows;
