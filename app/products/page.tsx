@@ -70,6 +70,7 @@ export default function ProductsListPage() {
                   <th className="px-3 py-2">Price</th>
                   <th className="px-3 py-2">GST %</th>
                   <th className="px-3 py-2">Stock</th>
+                  {role === "admin" && <th className="px-3 py-2">Printed</th>}
                   {role === "admin" && <th className="px-3 py-2">Actions</th>}
                 </tr>
               </thead>
@@ -82,6 +83,7 @@ export default function ProductsListPage() {
                     <td className="px-3 py-2">₹{p.unitPrice.toFixed(2)}</td>
                     <td className="px-3 py-2">{p.taxRatePct ?? 0}</td>
                     <td className="px-3 py-2">{p.stock}</td>
+                    {role === "admin" && <td className="px-3 py-2">{p.printedCount ?? 0}</td>}
                     {role === "admin" && (
                       <td className="px-3 py-2 flex gap-2">
                         <Link href={`/products/${p.id}`}><Button variant="outline" size="sm">Edit</Button></Link>
