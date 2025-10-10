@@ -4,12 +4,20 @@ import { Input } from "@/components/ui/input";
 import { Bell } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { signOut } from "@/lib/auth";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { observeLowStockProducts } from "@/lib/products";
 
 export function Topbar() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [open, setOpen] = useState(false);
+  const [lowCount, setLowCount] = useState(0);
+
+  useEffect(() => {
+    if (role !== "admin") return;
+    const unsub = observeLowStockProducts((items) => setLowCount(items.length));
+    return () => unsub && unsub();
+  }, [role]);
 
   function handleSignOut() {
     signOut().finally(() => {
@@ -26,6 +34,11 @@ export function Topbar() {
       </div>
       <button className="relative rounded-full p-2 hover:bg-muted text-muted-foreground" aria-label="Notifications">
         <Bell className="h-5 w-5" />
+        {role === "admin" && lowCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] leading-4 text-center">
+            {lowCount}
+          </span>
+        )}
       </button>
       <div className="relative">
         <button onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} className="rounded-full">

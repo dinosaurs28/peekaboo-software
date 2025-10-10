@@ -6,6 +6,7 @@ import { Topbar } from "@/components/layout/topbar";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { RecentInvoices } from "@/components/dashboard/recent-invoices";
 import { DollarSign, Clock, Users, AlertTriangle } from "lucide-react";
+import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -34,6 +35,7 @@ export default function DashboardPage() {
             <StatCard label="New Customers" value="15" icon={<Users className="h-5 w-5" />} />
             <StatCard label="Overdue Invoices" value="1" icon={<AlertTriangle className="h-5 w-5" />} />
           </div>
+          <LowStockAlerts />
           <RecentInvoices />
         </main>
       </div>

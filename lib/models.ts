@@ -32,6 +32,7 @@ export interface ProductDoc extends BaseDoc {
   sku: string; // internal SKU
   barcode?: string; // linked barcode code
   category?: string;
+  hsnCode?: string; // HSN/SAC code for GST
   unitPrice: number; // stored as number in smallest currency unit? (decide) currently decimal number
   costPrice?: number;
   stock: number; // current on-hand quantity
@@ -130,3 +131,13 @@ export const COLLECTIONS = {
   reports: 'Reports',
   settings: 'Settings'
 } as const;
+
+// Common product categories for initial UI; can be extended in Settings later
+export const CATEGORY_OPTIONS = [
+  'Toys',
+  'Clothes',
+  'Books',
+  'Stationery',
+  'Accessories',
+  'Electronics',
+] as const;
