@@ -9,7 +9,7 @@ import { DollarSign, Clock, Users, AlertTriangle } from "lucide-react";
 import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -35,7 +35,7 @@ export default function DashboardPage() {
             <StatCard label="New Customers" value="15" icon={<Users className="h-5 w-5" />} />
             <StatCard label="Overdue Invoices" value="1" icon={<AlertTriangle className="h-5 w-5" />} />
           </div>
-          <LowStockAlerts />
+          {role === "admin" && <LowStockAlerts />}
           <RecentInvoices />
         </main>
       </div>
