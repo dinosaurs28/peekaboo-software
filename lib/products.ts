@@ -15,27 +15,44 @@ import {
   type QuerySnapshot,
   type DocumentData,
 } from "firebase/firestore";
+import { increment } from "firebase/firestore";
 import { COLLECTIONS, ProductDoc } from "./models";
 
 function assertDb() {
   if (!db) throw new Error("Firestore not initialized");
 }
 
-function toProductDoc(id: string, data: any): ProductDoc {
+function asString(v: unknown, def = ""): string {
+  return typeof v === "string" ? v : def;
+}
+
+function asNumber(v: unknown, def = 0): number {
+  if (v == null) return def;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : def;
+}
+
+function asBool(v: unknown, def = true): boolean {
+  return typeof v === "boolean" ? v : def;
+}
+
+function toProductDoc(id: string, data: Record<string, unknown>): ProductDoc {
   const now = new Date().toISOString();
   return {
     id,
-    name: data.name || "",
-    sku: data.sku || "",
-    barcode: data.barcode,
-    category: data.category,
-    hsnCode: data.hsnCode,
-    unitPrice: Number(data.unitPrice ?? 0),
-    costPrice: data.costPrice != null ? Number(data.costPrice) : undefined,
-    stock: Number(data.stock ?? 0),
-    reorderLevel: data.reorderLevel != null ? Number(data.reorderLevel) : undefined,
-    taxRatePct: data.taxRatePct != null ? Number(data.taxRatePct) : undefined,
-    active: Boolean(data.active ?? true),
+    name: asString(data.name, ""),
+    sku: asString(data.sku, ""),
+    barcode: typeof data.barcode === "string" ? data.barcode : undefined,
+    category: typeof data.category === "string" ? data.category : undefined,
+    hsnCode: typeof data.hsnCode === "string" ? data.hsnCode : undefined,
+    unitPrice: asNumber(data.unitPrice, 0),
+    costPrice: data.costPrice != null ? asNumber(data.costPrice) : undefined,
+    stock: asNumber(data.stock, 0),
+    reorderLevel: data.reorderLevel != null ? asNumber(data.reorderLevel) : undefined,
+    taxRatePct: data.taxRatePct != null ? asNumber(data.taxRatePct) : undefined,
+    active: asBool(data.active, true),
+    printedCount: data.printedCount != null ? asNumber(data.printedCount, 0) : 0,
     createdAt: typeof data.createdAt === "string" ? data.createdAt : now,
     updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : now,
   };
@@ -92,7 +109,7 @@ export type UpsertProductInput = {
 export async function createProduct(input: UpsertProductInput): Promise<string> {
   assertDb();
   const col = collection(db!, COLLECTIONS.products);
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     ...input,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -106,7 +123,7 @@ export async function createProduct(input: UpsertProductInput): Promise<string> 
 export async function updateProduct(id: string, input: Partial<UpsertProductInput>): Promise<void> {
   assertDb();
   const ref = doc(db!, COLLECTIONS.products, id);
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     ...input,
     updatedAt: serverTimestamp(),
   };
@@ -118,4 +135,10 @@ export async function deleteProduct(id: string): Promise<void> {
   assertDb();
   const ref = doc(db!, COLLECTIONS.products, id);
   await deleteDoc(ref);
+}
+
+export async function incrementPrintedCount(id: string, qty: number): Promise<void> {
+  assertDb();
+  const ref = doc(db!, COLLECTIONS.products, id);
+  await updateDoc(ref, { printedCount: increment(qty), updatedAt: serverTimestamp() });
 }
