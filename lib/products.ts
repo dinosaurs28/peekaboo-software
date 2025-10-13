@@ -10,6 +10,8 @@ import {
   onSnapshot,
   orderBy,
   query,
+  where,
+  limit,
   serverTimestamp,
   updateDoc,
   type QuerySnapshot,
@@ -141,4 +143,15 @@ export async function incrementPrintedCount(id: string, qty: number): Promise<vo
   assertDb();
   const ref = doc(db!, COLLECTIONS.products, id);
   await updateDoc(ref, { printedCount: increment(qty), updatedAt: serverTimestamp() });
+}
+
+// POS helpers
+export async function findProductBySKU(sku: string): Promise<ProductDoc | null> {
+  assertDb();
+  const colRef = collection(db!, COLLECTIONS.products);
+  const qy = query(colRef, where("sku", "==", sku), limit(1));
+  const snap = await getDocs(qy);
+  if (snap.empty) return null;
+  const d = snap.docs[0];
+  return toProductDoc(d.id, d.data() as Record<string, unknown>);
 }
