@@ -258,7 +258,8 @@ export function PosPanel() {
               <option value="amount">₹ Amount</option>
               <option value="percent">% Percentage</option>
             </select>
-            <Input type="number" value={billDiscount} onChange={(e) => setBillDiscount(Number(e.target.value || 0))} className="w-28" />
+            <Input type="number" placeholder="0" value={billDiscount === 0 ? "" : billDiscount}
+              onChange={(e) => setBillDiscount(Number(e.target.value || 0))} className="w-28" />
           </div>
         </form>
         {error && <div className="text-sm text-red-600">{error}</div>}
@@ -305,7 +306,7 @@ export function PosPanel() {
                     <td className="px-3 py-2">{l.product.name}<div className="text-xs text-muted-foreground">{l.product.sku}</div></td>
                     <td className="px-3 py-2">₹{l.product.unitPrice.toFixed(2)}</td>
                     <td className="px-3 py-2">
-                      <Input type="number" className="w-20" value={l.qty}
+                      <Input type="number" className="w-20" placeholder="1" value={l.qty === 1 ? "" : l.qty}
                         onChange={(e) => setQty(l.product.id, Number(e.target.value || 1))} />
                     </td>
                     <td className="px-3 py-2">
@@ -314,7 +315,7 @@ export function PosPanel() {
                           <option value="amount">₹ Amount</option>
                           <option value="percent">% Percentage</option>
                         </select>
-                        <Input type="number" className="w-24" value={l.itemDiscount ?? 0}
+                        <Input type="number" className="w-24" placeholder="0" value={(l.itemDiscount ?? 0) === 0 ? "" : l.itemDiscount}
                           onChange={(e) => setItemDiscount(l.product.id, Number(e.target.value || 0))} />
                       </div>
                     </td>
@@ -343,7 +344,8 @@ export function PosPanel() {
               <option value="amount">₹ Amount</option>
               <option value="percent">% Percentage</option>
             </select>
-            <Input type="number" value={billDiscount} onChange={(e) => setBillDiscount(Number(e.target.value || 0))} />
+            <Input type="number" placeholder="0" value={billDiscount === 0 ? "" : billDiscount}
+              onChange={(e) => setBillDiscount(Number(e.target.value || 0))} />
           </div>
         </div>
         <div className="border rounded-md p-4">
