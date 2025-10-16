@@ -6,14 +6,17 @@ import type { ProductDoc } from "@/lib/models";
 import { decodeBarcode } from "@/lib/barcodes";
 import { findProductBySKU, listProducts } from "@/lib/products";
 import { checkoutCart } from "@/lib/pos";
+import { DropdownPanel } from "@/components/ui/dropdown-panel";
 import { useAuth } from "@/components/auth/auth-provider";
 
 export function PosPanel() {
   const [scanValue, setScanValue] = useState("");
   type CartLine = { product: ProductDoc; qty: number; itemDiscount?: number; itemDiscountMode?: 'amount' | 'percent' };
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   const [allProducts, setAllProducts] = useState<ProductDoc[]>([]);
   const [billDiscount, setBillDiscount] = useState<number>(0);
   const [billDiscountMode, setBillDiscountMode] = useState<'amount' | 'percent'>('amount');
@@ -115,10 +118,13 @@ export function PosPanel() {
         const copy = [...prev];
         copy[idx] = { ...copy[idx], qty: copy[idx].qty + 1 };
         showToast('success', `${product.name} × ${copy[idx].qty}`);
+        setSelectedIndex(idx);
         return copy;
       }
       showToast('success', `${product.name} added`);
-      return [...prev, { product, qty: 1 }];
+      const next = [...prev, { product, qty: 1 }];
+      setSelectedIndex(next.length - 1);
+      return next;
     });
 
     setScanValue("");
@@ -140,7 +146,18 @@ export function PosPanel() {
 
   function removeLine(id?: string) {
     if (!id) return;
-    setCart((prev) => prev.filter((l) => l.product.id !== id));
+    setCart((prev) => {
+      const idx = prev.findIndex((l) => l.product.id === id);
+      const next = prev.filter((l) => l.product.id !== id);
+      // Adjust selection
+      if (next.length === 0) {
+        setSelectedIndex(-1);
+      } else if (idx >= 0) {
+        const newIndex = Math.min(idx, next.length - 1);
+        setSelectedIndex(newIndex);
+      }
+      return next;
+    });
   }
 
   function setQty(id?: string, qty?: number) {
@@ -168,10 +185,13 @@ export function PosPanel() {
         const copy = [...prev];
         copy[idx] = { ...copy[idx], qty: copy[idx].qty + 1 };
         showToast('success', `${p.name} × ${copy[idx].qty}`);
+        setSelectedIndex(idx);
         return copy;
       }
       showToast('success', `${p.name} added`);
-      return [...prev, { product: p, qty: 1 }];
+      const next = [...prev, { product: p, qty: 1 }];
+      setSelectedIndex(next.length - 1);
+      return next;
     });
   }
 
@@ -209,6 +229,7 @@ export function PosPanel() {
       });
       showToast('success', 'Checkout complete. Invoice saved.');
       setCart([]);
+      setSelectedIndex(-1);
       setBillDiscount(0);
       setPaymentRef("");
     } catch (e) {
@@ -216,29 +237,54 @@ export function PosPanel() {
     }
   }
 
-  // Keyboard shortcuts for speed: + to increment last line, - to decrement, Backspace/Delete to remove
+  // Keyboard shortcuts for speed:
+  // ArrowUp/ArrowDown to move selection; + increment, - decrement, Backspace/Delete remove on selected line
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const ae = document.activeElement as HTMLElement | null;
       const tag = (ae?.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
       if (cart.length === 0) return;
-      const last = cart[cart.length - 1];
-      if (!last?.product?.id) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((idx) => {
+          if (idx < 0) return 0;
+          return Math.min(cart.length - 1, idx + 1);
+        });
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((idx) => {
+          if (idx < 0) return cart.length - 1;
+          return Math.max(0, idx - 1);
+        });
+        return;
+      }
+      const target = selectedIndex >= 0 ? cart[selectedIndex] : cart[cart.length - 1];
+      if (!target?.product?.id) return;
       if (e.key === '+') {
         e.preventDefault();
-        increment(last.product.id);
+        increment(target.product.id);
       } else if (e.key === '-') {
         e.preventDefault();
-        decrement(last.product.id);
+        decrement(target.product.id);
       } else if (e.key === 'Backspace' || e.key === 'Delete') {
         e.preventDefault();
-        removeLine(last.product.id);
+        removeLine(target.product.id);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [cart]);
+  }, [cart, selectedIndex]);
+
+  // Ensure selected row is visible
+  useEffect(() => {
+    if (selectedIndex >= 0) {
+      const row = rowRefs.current[selectedIndex];
+      row?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedIndex, cart.length]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -272,7 +318,7 @@ export function PosPanel() {
             onBlur={() => setTimeout(() => setSearchOpen(false), 120)}
           />
           {searchOpen && filtered.length > 0 && (
-            <div className="absolute z-10 mt-1 w-full border rounded-md bg-background max-h-64 overflow-auto">
+            <DropdownPanel className="absolute z-10 mt-1 w-full max-h-64 overflow-auto">
               {filtered.map((p) => (
                 <button key={p.id} className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
                   onClick={() => { addByProductId(p.id); setSearchTerm(""); setSearchOpen(false); inputRef.current?.focus(); }}>
@@ -280,7 +326,7 @@ export function PosPanel() {
                   <div className="text-xs text-muted-foreground">{p.sku} • ₹{p.unitPrice.toFixed(2)}</div>
                 </button>
               ))}
-            </div>
+            </DropdownPanel>
           )}
         </div>
         <div className="border rounded-md overflow-hidden">
@@ -301,8 +347,13 @@ export function PosPanel() {
                   <td className="px-3 py-4 text-muted-foreground" colSpan={6}>Scan or search items to add to the bill</td>
                 </tr>
               ) : (
-                cart.map((l) => (
-                  <tr key={l.product.id} className="border-t">
+                cart.map((l, idx) => (
+                  <tr
+                    key={l.product.id}
+                    ref={(el) => { rowRefs.current[idx] = el; }}
+                    onClick={() => setSelectedIndex(idx)}
+                    className={`border-t cursor-pointer ${idx === selectedIndex ? 'bg-muted/40 outline outline-1 outline-primary/50' : ''}`}
+                  >
                     <td className="px-3 py-2">{l.product.name}<div className="text-xs text-muted-foreground">{l.product.sku}</div></td>
                     <td className="px-3 py-2">₹{l.product.unitPrice.toFixed(2)}</td>
                     <td className="px-3 py-2">
