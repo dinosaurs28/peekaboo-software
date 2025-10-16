@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { signOut } from "@/lib/auth";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DropdownPanel } from "@/components/ui/dropdown-panel";
 import { observeLowStockProducts } from "@/lib/products";
 import type { ProductDoc } from "@/lib/models";
 import Link from "next/link";
@@ -83,7 +84,7 @@ export function Topbar() {
           )}
         </button>
         {notifOpen && (
-          <div className="absolute right-0 mt-2 w-80 rounded-md border bg-background text-foreground shadow-lg z-20 bg-white dark:bg-neutral-900 backdrop-blur-0">
+          <DropdownPanel className="absolute right-0 w-80">
             <div className="px-3 py-2 border-b text-sm font-medium">Notifications</div>
             <div className="max-h-72 overflow-auto p-2">
               {lowItems.length === 0 ? (
@@ -115,7 +116,7 @@ export function Topbar() {
             <div className="p-2 border-t text-right">
               <Link href="/products"><Button size="sm" variant="ghost">View all</Button></Link>
             </div>
-          </div>
+          </DropdownPanel>
         )}
       </div>
       <div className="relative" ref={menuRef}>
@@ -123,14 +124,14 @@ export function Topbar() {
           <Avatar fallback={(user?.email?.[0] || "").toUpperCase() || "U"} />
         </button>
         {open && (
-          <div className="absolute right-0 mt-2 w-40 rounded-md border bg-background text-foreground shadow-lg z-20 bg-white dark:bg-neutral-900 backdrop-blur-0">
+          <DropdownPanel className="absolute right-0 w-40">
             <div className="px-3 py-2 text-xs text-muted-foreground border-b">
               {user?.email || "Signed in"}
             </div>
             <div className="p-2">
               <Button variant="outline" className="w-full justify-start" onClick={handleSignOut}>Sign out</Button>
             </div>
-          </div>
+          </DropdownPanel>
         )}
       </div>
     </header>
