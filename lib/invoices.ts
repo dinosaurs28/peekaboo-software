@@ -1,6 +1,6 @@
 "use client";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, orderBy, query, where, type DocumentData, type QuerySnapshot, type QueryConstraint } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, where, type DocumentData, type QuerySnapshot, type QueryConstraint, type FirestoreError } from "firebase/firestore";
 import type { InvoiceDoc, PaymentRecord } from "@/lib/models";
 import { COLLECTIONS } from "@/lib/models";
 
@@ -66,21 +66,53 @@ export function observeInvoices(cb: (invoices: InvoiceDoc[]) => void, filters?: 
   const col = collection(db!, COLLECTIONS.invoices);
 
   const constraints: QueryConstraint[] = [];
-  // Status filter
   if (filters?.status) constraints.push(where("status", "==", filters.status));
-  // Cashier filter
   if (filters?.cashierUserId) constraints.push(where("cashierUserId", "==", filters.cashierUserId));
-  // Date range on issuedAt (stored as ISO string)
   if (filters?.issuedFromIso) constraints.push(where("issuedAt", ">=", filters.issuedFromIso));
   if (filters?.issuedToIso) constraints.push(where("issuedAt", "<=", filters.issuedToIso));
-
-  // Always order by issuedAt desc for browsing recent first
   constraints.push(orderBy("issuedAt", "desc"));
 
-  const q = query(col, ...constraints);
-  const unsub = onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
-    const list: InvoiceDoc[] = snap.docs.map((d) => toInvoiceDoc(d.id, d.data() as Record<string, unknown>));
-    cb(list);
-  });
-  return unsub;
+  const applyClientFilters = (list: InvoiceDoc[]): InvoiceDoc[] => {
+    let out = list;
+    if (filters?.status) out = out.filter((i) => i.status === filters.status);
+    if (filters?.cashierUserId) out = out.filter((i) => i.cashierUserId === filters.cashierUserId);
+    if (filters?.issuedFromIso) out = out.filter((i) => i.issuedAt >= filters.issuedFromIso!);
+    if (filters?.issuedToIso) out = out.filter((i) => i.issuedAt <= filters.issuedToIso!);
+    return out;
+  };
+
+  let activeUnsub: (() => void) | null = null;
+
+  const subscribeMain = () => {
+    const q = query(col, ...constraints);
+    activeUnsub = onSnapshot(
+      q,
+      (snap: QuerySnapshot<DocumentData>) => {
+        const list: InvoiceDoc[] = snap.docs.map((d) => toInvoiceDoc(d.id, d.data() as Record<string, unknown>));
+        cb(list);
+      },
+      (err: FirestoreError) => {
+        if (err.code === "failed-precondition") {
+          // Likely missing composite index; fallback to client-side filtering
+          // eslint-disable-next-line no-console
+          console.warn("Missing index for invoices query; falling back to client-side filtering.", err.message);
+          if (activeUnsub) { activeUnsub(); activeUnsub = null; }
+          const fallbackQ = query(col, orderBy("issuedAt", "desc"));
+          activeUnsub = onSnapshot(fallbackQ, (snap2: QuerySnapshot<DocumentData>) => {
+            const list: InvoiceDoc[] = snap2.docs.map((d) => toInvoiceDoc(d.id, d.data() as Record<string, unknown>));
+            cb(applyClientFilters(list));
+          });
+        } else {
+          // eslint-disable-next-line no-console
+          console.error("Invoices snapshot error:", err);
+        }
+      }
+    );
+  };
+
+  subscribeMain();
+
+  return () => {
+    if (activeUnsub) activeUnsub();
+  };
 }

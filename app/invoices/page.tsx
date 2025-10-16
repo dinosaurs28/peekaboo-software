@@ -66,7 +66,7 @@ export default function InvoicesPage() {
                 </div>
                 <div className="flex flex-col">
                   <label className="text-xs text-muted-foreground">Status</label>
-                  <select className="h-9 rounded-md border bg-background px-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value as InvoiceDoc["status"] | "") }>
+                  <select className="h-9 rounded-md border bg-background px-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value as InvoiceDoc["status"] | "")}>
                     <option value="">All</option>
                     <option value="paid">Paid</option>
                     <option value="partial">Partial</option>
