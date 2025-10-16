@@ -1,6 +1,6 @@
 "use client";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, runTransaction, doc, increment } from "firebase/firestore";
+import { collection, serverTimestamp, runTransaction, doc, increment } from "firebase/firestore";
 import type { InvoiceDoc } from "@/lib/models";
 import { COLLECTIONS } from "@/lib/models";
 
@@ -10,6 +10,7 @@ export type CheckoutInput = {
   paymentMethod?: 'cash' | 'card' | 'upi' | 'wallet';
   paymentReferenceId?: string;
   cashierUserId?: string;
+  customerId?: string;
 };
 
 export async function checkoutCart(input: CheckoutInput): Promise<string> {
@@ -35,13 +36,13 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
     // Create invoice document
     const inv: Omit<InvoiceDoc, 'id'> = {
       invoiceNumber: "TEMP-" + Date.now(),
-      customerId: undefined,
+      // customerId omitted unless provided
       items: input.lines.map((l) => ({ productId: l.productId, name: l.name, quantity: l.qty, unitPrice: l.unitPrice, discountAmount: l.lineDiscount ?? 0 })),
       subtotal,
       taxTotal: 0,
       discountTotal: billDisc,
       grandTotal,
-      payments: [{ method, amount: grandTotal, referenceId: refId }],
+      payments: [{ method, amount: grandTotal, ...(refId ? { referenceId: refId } : {}) }],
       balanceDue: 0,
       cashierUserId,
       status: 'paid',
@@ -50,12 +51,14 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       updatedAt: nowIso,
     };
 
-    const invRef = await addDoc(collection(dbx, COLLECTIONS.invoices), {
+    // Create invoice inside the transaction using tx.set
+    const invRef = doc(collection(dbx, COLLECTIONS.invoices));
+    tx.set(invRef, {
       ...inv,
+      ...(input.customerId ? { customerId: input.customerId } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-
     return invRef.id;
   });
 

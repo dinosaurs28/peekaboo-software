@@ -233,7 +233,8 @@ export function PosPanel() {
       setBillDiscount(0);
       setPaymentRef("");
     } catch (e) {
-      showToast('error', 'Checkout failed. Try again.');
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast('error', `Checkout failed: ${msg}`);
     }
   }
 
@@ -352,7 +353,7 @@ export function PosPanel() {
                     key={l.product.id}
                     ref={(el) => { rowRefs.current[idx] = el; }}
                     onClick={() => setSelectedIndex(idx)}
-                    className={`border-t cursor-pointer ${idx === selectedIndex ? 'bg-muted/40 outline outline-1 outline-primary/50' : ''}`}
+                    className={`border-t cursor-pointer ${idx === selectedIndex ? 'bg-muted/40 outline-1 outline-primary/50' : ''}`}
                   >
                     <td className="px-3 py-2">{l.product.name}<div className="text-xs text-muted-foreground">{l.product.sku}</div></td>
                     <td className="px-3 py-2">₹{l.product.unitPrice.toFixed(2)}</td>
