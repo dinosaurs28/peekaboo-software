@@ -95,52 +95,109 @@ Seed demo data for testing
 
 ✅ Output: Complete app feature-ready for testing cycle.
 
-## Testing Brief (Admin vs Cashier)
+## Yet To Implement
+Here’s a concise gap analysis against your README scope, plus a suggested enhancement list and a fresh testing brief you can use for a sprint.
 
-Below are quick test flows to validate current features. Use separate users for Admin and Cashier roles.
+What’s left to do (by scope)
 
-### Admin
-- Auth & Roles
-	- Sign in; verify access to Dashboard, Products, Settings, Invoices.
-	- Cashier-only POS appears on Dashboard for cashier users; admins see analytics cards and alerts.
-- Dashboard
-	- Low-stock alerts panel updates in real-time when product stock <= reorder level.
-	- Notifications dropdown shows the same items; opaque dropdown surface and click-outside to close.
-- Products & Inventory
-	- Create/Edit/Delete product with fields: name, SKU, HSN, category, unit price, stock, reorder level, GST.
-	- Validate SKU uniqueness and basic required fields.
-	- Stock updates reflect immediately in low-stock alerts and POS search.
-- Barcode Generator (Settings → Barcodes)
-	- Generate Code 128 labels encoding PB|CAT|SKU.
-	- Export A4 3×10 PDF; verify aligned text and no overlap; printedCount increments.
-- Invoices (Real-time)
-	- Visit /invoices. Adjust filters (date range, status, cashier) and verify real-time updates.
-	- Click any invoice to open details; verify line items (qty, unit, item-level discount), bill-level discount, totals.
-	- Print button is visible and works (window.print) for admin only.
-- Security & Indexes
-	- Verify only Admin can access Product create/edit/delete and Barcode Generator.
-	- If Firestore requests an index on /invoices filters, UI continues via client-side fallback; optionally add suggested composite index for performance.
+Phase 2: Product & Inventory
+Inventory tracking
+Inventory adjustment UI (manual increase/decrease) and transactional helper.
+Inventory logs (who/when/why) for audit.
+Category management page (optional; categories are used but not managed separately).
 
-### Cashier
-- Auth & Role Gating
-	- Sign in; Dashboard shows POS panel. Hidden admin-only menus/actions.
-- POS Scan/Search & Cart
-	- #TODO:Scan barcode (PB|CAT|SKU) or search by name/SKU; item adds to cart or increments quantity.
-	- Edit qty inline; remove line; item-level discount with amount/% modes.
-	- Bill-level discount with amount/%; totals update correctly.
-	- Keyboard: Arrow Up/Down moves focused item; +/− adjust qty; Backspace/Delete removes focused line.
-	- Draft persistence: refresh page; cart and payment details restore from localStorage.
-- Customer Capture at Checkout
-	- Enter phone; click Check.
-		- If existing, name/email/DOB auto-fill and additional inputs are hidden.
-		- If new, name required; email and kid’s DOB optional; a new customer is created and linked on checkout.
-	- Complete checkout; success toast appears; cart clears.
-- Invoices (Real-time)
-	- Visit /invoices; list shows only this cashier’s invoices with cashier name.
-	- Click row to view details. Print button should NOT be visible for cashier.
+Phase 3: POS & Billing
+Tax handling (GST slab calculation in cart lines and invoice totals).
+Invoice outputs
+Printable/PDF invoice template (admin): dedicated layout vs window.print.
+Email invoice to customer.
+Payments
+Multi-payment (pay with cash+UPI split).
+Split payments UX and persistence.
+Extras (optional but useful)
+Receipt template for thermal printers (80mm).
 
-### General
-- Firebase initialization guards: app loads even if env misconfigured (with console warnings).
-- Opaque dropdown surfaces are consistent across POS search, topbar menus, and notifications.
-- Firestore transactions: checkout atomically decrements stock and saves invoice.
-- Undefined field handling: writes never include undefined (avoids Firestore errors).
+Phase 4: Customer & Offers
+Customer CRUD (full list, view, edit).
+Customer purchase history view.
+Offers module
+Offer rules engine (%, flat, BOGO, item/category/date rules).
+POS auto-alert for active offers and application.
+
+Phase 5: Reports & Accounting
+Sales reports (daily/weekly/monthly).
+Stock report (current, movements, low-stock export).
+Payment mode report.
+Accounting CSV/XLSX export with required columns and filters.
+
+Phase 6: Polish & Integrations
+Mobile-first refinements (dashboard and POS).
+Invoice template customization (branding).
+Final security & role permissions (Firestore Rules hardened).
+Seed demo data script.
+Cross-cutting left to finish
+Firestore Security Rules: enforce role-based access (admin-only mutations, cashier scope, deny role escalation).
+Composite indexes for invoices queries (remove fallback).
+Error monitoring/analytics (optional).
+
+## Robustness upgrades worth considering
+
+Data integrity and security
+Comprehensive Firestore Rules: per-collection constraints, write validators, role checks; unit tests for rules.
+Server-signed barcode checksum (HMAC) if tamper resistance matters later.
+Returns/voids/exchanges flow that reverses stock and annotates invoices.
+Inventory operations
+Purchase Orders and Goods Receipt to increase stock with cost tracking.
+Stocktake (cycle counts) with variance reconciliation.
+POS quality of life
+Offline queue for scans and deferred checkout when network blips.
+Shift/session tracking: opening float, cash drawer totals, Z reports.
+Price overrides with reason and admin PIN.
+Performance/UX
+Lazy-load heavy libs (jsPDF) and defer until used.
+Skeleton loaders for live sections.
+Global toasts/announcements channel and rate-limited log capture.
+Ops/DevEx
+E2E tests with Playwright for core flows.
+CI build/typecheck/lint gates and environment checks.
+
+## New testing brief (sprint checklist)
+
+Setup and roles
+Verify env vars load, app boots without “Internal Server Error”.
+Login as Admin and as Cashier; role gating works; sidebar routes correct.
+Products & inventory
+Create/edit/delete product; SKU uniqueness enforced in practice.
+Update stock/reorder level; low-stock panel and bell dropdown react in real-time.
+Barcode generator
+Export A4 3×10 PDF; scan a label in POS; title/code/MRP alignment consistent across columns.
+Printed count increments for admin view only.
+POS (cashier)
+Scan PB|CAT|SKU and plain SKU; adds/merges line; success toast.
+Error scans show bottom-right toasts (invalid/NOREAD/SKU not found); focus returns to scan.
+Manual search (name/SKU) via opaque dropdown; add merges correctly.
+Item discount: select ₹/% and apply; math correct.
+Bill discount: select ₹/% and apply; math correct.
+Qty edit inline; remove line; keyboard: Arrow Up/Down selects row; +/- changes qty; Delete removes selected.
+Draft persistence: add lines, set discounts, payment method; refresh; draft restores; Clear Draft resets.
+Customer capture at checkout
+Enter phone → existing customer auto-detected (no extra fields).
+New phone → name required; email/kid’s DOB optional; customer created and linked on checkout.
+Checkout and stock
+Confirm payment & checkout writes invoice, decrements stock transactionally.
+No undefined writes; success toast; draft cleared.
+Invoices (real-time)
+Cashier: /invoices shows only own invoices; live update on new checkout; details page visible; no print button.
+Admin: /invoices shows all; filters
+Date range (from/to), status, cashier; results real-time.
+Click row → details page; Print button visible and works.
+If index warning appears, UI still functions (fallback); consider adding suggested indexes.
+Dashboard (admin)
+From/To date filter (default today) affects only stat cards.
+Revenue and Expenses (COGS) and New Customers reflect chosen range.
+Below stats: 2-column layout—Recent Invoices (real-time) and Low Stock items.
+Notifications and menus
+Bell dropdown opaque; shows “Low Stock” with item names only (no counts); badge for admin only.
+Profile menu opaque; sign-out works; authenticated routes protected.
+Error and resilience
+Refresh after edits/HMR: no generic “Internal Server Error”; global error boundary shows friendly UI if anything unexpected happens.
