@@ -45,7 +45,6 @@ function toProductDoc(id: string, data: Record<string, unknown>): ProductDoc {
     id,
     name: asString(data.name, ""),
     sku: asString(data.sku, ""),
-    barcode: typeof data.barcode === "string" ? data.barcode : undefined,
     category: typeof data.category === "string" ? data.category : undefined,
     hsnCode: typeof data.hsnCode === "string" ? data.hsnCode : undefined,
     unitPrice: asNumber(data.unitPrice, 0),
@@ -101,7 +100,6 @@ export type UpsertProductInput = {
   stock: number;
   active: boolean;
   category?: string;
-  barcode?: string;
   hsnCode?: string;
   costPrice?: number;
   reorderLevel?: number;

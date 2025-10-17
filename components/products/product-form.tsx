@@ -19,7 +19,6 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
     stock: initial?.stock ?? 0,
     active: initial?.active ?? true,
     category: initial?.category,
-    barcode: initial?.barcode,
     hsnCode: initial?.hsnCode,
     costPrice: initial?.costPrice,
     reorderLevel: initial?.reorderLevel,
@@ -99,10 +98,6 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
         <div className="space-y-1">
           <label className="text-sm font-medium">Reorder Level</label>
           <Input type="number" value={String(form.reorderLevel ?? 0)} onChange={(e) => update("reorderLevel", parseInt(e.target.value || "0", 10))} placeholder="10" />
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Barcode</label>
-          <Input value={form.barcode ?? ""} onChange={(e) => update("barcode", e.target.value)} placeholder="EAN13 / Code128" />
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">Active</label>
