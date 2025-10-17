@@ -11,6 +11,7 @@ export type CheckoutInput = {
   paymentReferenceId?: string;
   cashierUserId?: string;
   customerId?: string;
+  cashierName?: string;
 };
 
 export async function checkoutCart(input: CheckoutInput): Promise<string> {
@@ -23,6 +24,7 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
   const method = input.paymentMethod ?? 'cash';
   const refId = input.paymentReferenceId;
   const cashierUserId = input.cashierUserId ?? 'current-user';
+  const cashierName = input.cashierName;
 
   // Transaction: decrement stock for each product and then create invoice
   const invoiceId = await runTransaction(dbx, async (tx) => {
@@ -45,6 +47,7 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       payments: [{ method, amount: grandTotal, ...(refId ? { referenceId: refId } : {}) }],
       balanceDue: 0,
       cashierUserId,
+      ...(cashierName ? { cashierName } : {}),
       status: 'paid',
       issuedAt: nowIso,
       createdAt: nowIso,

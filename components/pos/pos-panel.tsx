@@ -6,6 +6,7 @@ import type { ProductDoc } from "@/lib/models";
 import { decodeBarcode } from "@/lib/barcodes";
 import { findProductBySKU, listProducts } from "@/lib/products";
 import { checkoutCart } from "@/lib/pos";
+import { findCustomerByPhone, createCustomer } from "@/lib/customers";
 import { DropdownPanel } from "@/components/ui/dropdown-panel";
 import { useAuth } from "@/components/auth/auth-provider";
 
@@ -26,6 +27,13 @@ export function PosPanel() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'upi' | 'wallet'>('cash');
   const [paymentRef, setPaymentRef] = useState("");
   const { user } = useAuth();
+  // Customer capture state
+  const [custPhone, setCustPhone] = useState("");
+  const [custName, setCustName] = useState("");
+  const [custEmail, setCustEmail] = useState("");
+  const [custKidsDob, setCustKidsDob] = useState("");
+  const [custFound, setCustFound] = useState<{ id: string; name: string } | null>(null);
+  const [custChecking, setCustChecking] = useState(false);
 
   // Focus the input to capture scanner entries
   useEffect(() => {
@@ -55,9 +63,9 @@ export function PosPanel() {
   // Draft persistence (save)
   useEffect(() => {
     try {
-      localStorage.setItem("pos.cart.v1", JSON.stringify({ cart, billDiscount, billDiscountMode, paymentMethod, paymentRef }));
+      localStorage.setItem("pos.cart.v1", JSON.stringify({ cart, billDiscount, billDiscountMode, paymentMethod, paymentRef, custPhone, custName, custEmail, custKidsDob }));
     } catch { /* ignore */ }
-  }, [cart, billDiscount, billDiscountMode, paymentMethod, paymentRef]);
+  }, [cart, billDiscount, billDiscountMode, paymentMethod, paymentRef, custPhone, custName, custEmail, custKidsDob]);
 
   const lineDiscount = useCallback((l: CartLine) => {
     const base = l.product.unitPrice * l.qty;
@@ -211,9 +219,55 @@ export function PosPanel() {
     }, 3000);
   }
 
+  async function lookupCustomerByPhone() {
+    const phone = custPhone.trim();
+    if (!phone) {
+      setCustFound(null);
+      return;
+    }
+    try {
+      setCustChecking(true);
+      const c = await findCustomerByPhone(phone);
+      if (c) {
+        setCustFound({ id: c.id!, name: c.name });
+        setCustName(c.name || "");
+        setCustEmail(c.email || "");
+        setCustKidsDob(c.kidsDob || "");
+      } else {
+        setCustFound(null);
+        // keep entered values (if any), otherwise clear name for clarity
+        if (!custName) setCustName("");
+        if (!custEmail) setCustEmail("");
+        if (!custKidsDob) setCustKidsDob("");
+      }
+    } catch {
+      // ignore lookup errors for now but notify
+      showToast('error', 'Failed to lookup customer');
+    } finally {
+      setCustChecking(false);
+    }
+  }
+
   async function onCheckout() {
     if (cart.length === 0) return;
     try {
+      // Resolve customerId by phone
+      let customerId: string | undefined = undefined;
+      const phone = custPhone.trim();
+      if (phone) {
+        const existing = await findCustomerByPhone(phone);
+        if (existing) {
+          customerId = existing.id!;
+        } else {
+          const name = custName.trim();
+          if (!name) {
+            showToast('error', 'Enter customer name');
+            return;
+          }
+          const newId = await createCustomer({ name, phone, email: custEmail.trim() || undefined, kidsDob: custKidsDob || undefined });
+          customerId = newId;
+        }
+      }
       await checkoutCart({
         lines: cart.map((l) => ({
           productId: l.product.id!,
@@ -226,12 +280,19 @@ export function PosPanel() {
         paymentMethod,
         paymentReferenceId: paymentRef || undefined,
         cashierUserId: user?.uid,
+        cashierName: user?.displayName || user?.email || 'Cashier',
+        customerId,
       });
       showToast('success', 'Checkout complete. Invoice saved.');
       setCart([]);
       setSelectedIndex(-1);
       setBillDiscount(0);
       setPaymentRef("");
+      setCustPhone("");
+      setCustName("");
+      setCustEmail("");
+      setCustKidsDob("");
+      setCustFound(null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       showToast('error', `Checkout failed: ${msg}`);
@@ -385,6 +446,25 @@ export function PosPanel() {
         </div>
       </div>
       <div className="space-y-4">
+        <div className="border rounded-md p-4 space-y-3">
+          <div className="text-sm font-medium">Customer</div>
+          <div className="flex items-center gap-2">
+            <Input placeholder="Phone number" value={custPhone} onChange={(e) => setCustPhone(e.target.value)} onBlur={lookupCustomerByPhone} className="flex-1" />
+            <Button type="button" variant="outline" onClick={lookupCustomerByPhone} disabled={custChecking}>{custChecking ? 'Checking…' : 'Check'}</Button>
+          </div>
+          {custFound ? (
+            <div className="text-xs text-muted-foreground">Existing customer: <span className="font-medium">{custFound.name}</span></div>
+          ) : (
+            <div className="space-y-2">
+              <Input placeholder="Customer name" value={custName} onChange={(e) => setCustName(e.target.value)} />
+              <Input placeholder="Email (optional)" value={custEmail} onChange={(e) => setCustEmail(e.target.value)} />
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-muted-foreground">Kid&apos;s DOB</label>
+                <Input type="date" value={custKidsDob} onChange={(e) => setCustKidsDob(e.target.value)} className="w-48" />
+              </div>
+            </div>
+          )}
+        </div>
         <div className="border rounded-md p-4">
           <div className="text-sm text-muted-foreground">Subtotal</div>
           <div className="text-xl font-semibold">₹{subTotal.toFixed(2)}</div>
