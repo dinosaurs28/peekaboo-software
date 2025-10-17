@@ -32,7 +32,11 @@ export default function CreateUserDebugPage() {
 
   return (
     <div style={{ padding: 20, fontFamily: "ui-sans-serif, system-ui", maxWidth: 560 }}>
-      <h1 style={{ fontSize: 20, fontWeight: 600 }}>Create User (Debug)</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <a href="/debug/firebase" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, textDecoration: 'none', color: '#111827' }}>← Back</a>
+        <h1 style={{ fontSize: 20, fontWeight: 600 }}>Create User (Debug)</h1>
+        <span />
+      </div>
       <p style={{ marginTop: 6, color: "#6b7280" }}>
         Dev-only helper to seed an account. Enable Email/Password in Firebase Console → Authentication first. Remove this page before production.
       </p>
