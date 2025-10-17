@@ -47,6 +47,7 @@ export function toInvoiceDoc(id: string, data: Record<string, unknown>): Invoice
     })) : [],
     balanceDue: asNumber(data.balanceDue, 0),
     cashierUserId: asString(data.cashierUserId, ""),
+    cashierName: typeof data.cashierName === "string" ? data.cashierName : undefined,
     status: asInvoiceStatus(data.status),
     issuedAt: asString(data.issuedAt, now),
     createdAt: asString(data.createdAt, now),
