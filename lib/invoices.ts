@@ -63,8 +63,12 @@ export type InvoiceFilters = {
 };
 
 export function observeInvoices(cb: (invoices: InvoiceDoc[]) => void, filters?: InvoiceFilters) {
-  if (!db) throw new Error("Firestore not initialized");
-  const col = collection(db!, COLLECTIONS.invoices);
+  // Be resilient if Firebase isn't initialized (e.g., missing envs in dev)
+  if (!db) {
+    try { cb([]); } catch { /* noop */ }
+    return () => {};
+  }
+  const col = collection(db, COLLECTIONS.invoices);
 
   const constraints: QueryConstraint[] = [];
   if (filters?.status) constraints.push(where("status", "==", filters.status));
