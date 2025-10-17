@@ -95,7 +95,6 @@ export function observeInvoices(cb: (invoices: InvoiceDoc[]) => void, filters?: 
       (err: FirestoreError) => {
         if (err.code === "failed-precondition") {
           // Likely missing composite index; fallback to client-side filtering
-          // eslint-disable-next-line no-console
           console.warn("Missing index for invoices query; falling back to client-side filtering.", err.message);
           if (activeUnsub) { activeUnsub(); activeUnsub = null; }
           const fallbackQ = query(col, orderBy("issuedAt", "desc"));
@@ -104,7 +103,6 @@ export function observeInvoices(cb: (invoices: InvoiceDoc[]) => void, filters?: 
             cb(applyClientFilters(list));
           });
         } else {
-          // eslint-disable-next-line no-console
           console.error("Invoices snapshot error:", err);
         }
       }

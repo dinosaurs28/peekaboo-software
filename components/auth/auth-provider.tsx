@@ -33,7 +33,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const r = await getUserRole(u.uid);
           setRole(r);
         } catch (err) {
-          // eslint-disable-next-line no-console
           console.error("Failed to ensure user document or get role:", err);
           setRole(null);
         }

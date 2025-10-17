@@ -22,7 +22,7 @@ export default function NewProductPage() {
         <Topbar />
         <main className="flex-1 p-6 space-y-6">
           <h1 className="text-xl font-semibold">New Product</h1>
-          <ProductForm mode="create" onSaved={(id) => (window.location.href = "/products")} />
+          <ProductForm mode="create" onSaved={() => (window.location.href = "/products")} />
         </main>
       </div>
     </div>

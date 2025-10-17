@@ -39,7 +39,6 @@ if (shouldInit) {
   // Log a friendly warning on the client for easier debugging
   // Mask API key when logging
   const masked = (val?: string | null) => (val ? `${val.slice(0, 6)}...${val.slice(-4)}` : "<missing>");
-  // eslint-disable-next-line no-console
   console.warn(
     "Firebase not initialized. Missing envs:",
     missingEnv,

@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useParams } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, type DocumentData } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import type { InvoiceDoc } from "@/lib/models";
 import { toInvoiceDoc } from "@/lib/invoices";
 import { Sidebar } from "@/components/layout/sidebar";

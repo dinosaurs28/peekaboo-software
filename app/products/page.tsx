@@ -27,7 +27,6 @@ export default function ProductsListPage() {
         const res = await listProducts();
         if (mounted) setProducts(res);
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error(e);
       }
     }

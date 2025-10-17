@@ -69,8 +69,7 @@ export default function BarcodeGeneratorPage() {
       setProducts(list);
       if (list.length > 0) setProductId(list[0].id || "");
     }).catch((e) => console.error(e));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user, role]);
+  }, [loading, user, role, router]);
 
   const selected = useMemo(() => products.find((p) => p.id === productId), [products, productId]);
 
@@ -84,7 +83,6 @@ export default function BarcodeGeneratorPage() {
       // Preview without the human-readable text to reflect PDF layout
       JsBarcode(canvas, code, { format: "CODE128", displayValue: false, margin: 6, height: 36 });
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error("Barcode render failed", e);
     }
   }, [selected, qty]);
@@ -109,7 +107,6 @@ export default function BarcodeGeneratorPage() {
       const labelPerPage = spec.cols * spec.rows;
       const total = Math.max(1, Math.min(300, Math.floor(qty)));
       for (let i = 0; i < total; i++) {
-        const pageIndex = Math.floor(i / labelPerPage);
         const indexOnPage = i % labelPerPage;
         if (i > 0 && indexOnPage === 0) doc.addPage();
 
@@ -152,7 +149,6 @@ export default function BarcodeGeneratorPage() {
       // Update printed count after successful save
       if (selected.id) await incrementPrintedCount(selected.id, Math.max(1, Math.min(300, Math.floor(qty))));
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error("PDF export failed", e);
     } finally {
       setBusy(false);
