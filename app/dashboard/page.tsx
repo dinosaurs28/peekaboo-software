@@ -71,7 +71,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!db) return;
     const col = collection(db, COLLECTIONS.invoices);
-  const constraints: QueryConstraint[] = [orderBy("issuedAt", "desc")];
+    const constraints: QueryConstraint[] = [orderBy("issuedAt", "desc")];
     if (fromIso) constraints.push(where("issuedAt", ">=", fromIso));
     if (toIso) constraints.push(where("issuedAt", "<=", toIso));
     const q = query(col, ...constraints);
@@ -101,7 +101,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!db) return;
     const col = collection(db, COLLECTIONS.customers);
-  const constraints: QueryConstraint[] = [];
+    const constraints: QueryConstraint[] = [];
     if (customersFromTs) constraints.push(where("createdAt", ">=", customersFromTs));
     if (customersToTs) constraints.push(where("createdAt", "<=", customersToTs));
     const q = constraints.length ? query(col, ...constraints) : query(col);
