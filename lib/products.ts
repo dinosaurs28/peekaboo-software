@@ -60,16 +60,16 @@ function toProductDoc(id: string, data: Record<string, unknown>): ProductDoc {
 }
 
 export async function listProducts(): Promise<ProductDoc[]> {
-  assertDb();
-  const col = collection(db!, COLLECTIONS.products);
+  if (!db) return [];
+  const col = collection(db, COLLECTIONS.products);
   const q = query(col, orderBy("name"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => toProductDoc(d.id, d.data()));
 }
 
 export async function getProduct(id: string): Promise<ProductDoc | null> {
-  assertDb();
-  const ref = doc(db!, COLLECTIONS.products, id);
+  if (!db) return null;
+  const ref = doc(db, COLLECTIONS.products, id);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
   return toProductDoc(snap.id, snap.data());
@@ -82,8 +82,8 @@ export async function listLowStockProducts(): Promise<ProductDoc[]> {
 }
 
 export function observeLowStockProducts(cb: (items: ProductDoc[]) => void) {
-  assertDb();
-  const colRef = collection(db!, COLLECTIONS.products);
+  if (!db) { try { cb([]); } catch { /* noop */ } return () => {}; }
+  const colRef = collection(db, COLLECTIONS.products);
   const q = query(colRef, orderBy("name"));
   // Use onSnapshot to reflect changes in real time
   const unsub = onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
@@ -145,8 +145,8 @@ export async function incrementPrintedCount(id: string, qty: number): Promise<vo
 
 // POS helpers
 export async function findProductBySKU(sku: string): Promise<ProductDoc | null> {
-  assertDb();
-  const colRef = collection(db!, COLLECTIONS.products);
+  if (!db) return null;
+  const colRef = collection(db, COLLECTIONS.products);
   const qy = query(colRef, where("sku", "==", sku), limit(1));
   const snap = await getDocs(qy);
   if (snap.empty) return null;
