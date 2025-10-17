@@ -23,8 +23,8 @@ function toCustomerDoc(id: string, data: Record<string, unknown>): CustomerDoc {
 }
 
 export async function findCustomerByPhone(phone: string): Promise<CustomerDoc | null> {
-  assertDb();
-  const col = collection(db!, COLLECTIONS.customers);
+  if (!db) return null;
+  const col = collection(db, COLLECTIONS.customers);
   const qy = query(col, where('phone', '==', phone), limit(1));
   const snap = await getDocs(qy);
   if (snap.empty) return null;
@@ -58,8 +58,8 @@ export async function updateCustomer(id: string, input: Partial<UpsertCustomerIn
 }
 
 export async function getCustomer(id: string): Promise<CustomerDoc | null> {
-  assertDb();
-  const ref = doc(db!, COLLECTIONS.customers, id);
+  if (!db) return null;
+  const ref = doc(db, COLLECTIONS.customers, id);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
   return toCustomerDoc(snap.id, snap.data() as Record<string, unknown>);
