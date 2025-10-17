@@ -95,24 +95,6 @@ Seed demo data for testing
 
 ✅ Output: Complete app feature-ready for testing cycle.
 
-
-## Testing Phase 2
- Product CRUD: add/edit/delete and validation (unique SKU, required fields).
-
- Bulk CSV import: map & dry-run, then import.
-
- Barcode generation: single + bulk PDF download + correct label layout.
-
- POS sale transaction: concurrency stress test (simulate 5 parallel sales). Ensure no negative stock.
-
- Inventory logs: every stock change has a log entry.
-
- Low-stock triggers: alert created only once when threshold breached; resolved on restock.
-
- Security rules: admin-only endpoints tested using different auth roles.
-
- UI: barcode scanned via keyboard-emulating scanner finds product by barcode.
-
 ## Testing Brief (Admin vs Cashier)
 
 Below are quick test flows to validate current features. Use separate users for Admin and Cashier roles.
@@ -143,7 +125,7 @@ Below are quick test flows to validate current features. Use separate users for 
 - Auth & Role Gating
 	- Sign in; Dashboard shows POS panel. Hidden admin-only menus/actions.
 - POS Scan/Search & Cart
-	- Scan barcode (PB|CAT|SKU) or search by name/SKU; item adds to cart or increments quantity.
+	- #TODO:Scan barcode (PB|CAT|SKU) or search by name/SKU; item adds to cart or increments quantity.
 	- Edit qty inline; remove line; item-level discount with amount/% modes.
 	- Bill-level discount with amount/%; totals update correctly.
 	- Keyboard: Arrow Up/Down moves focused item; +/− adjust qty; Backspace/Delete removes focused line.
