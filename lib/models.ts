@@ -23,6 +23,7 @@ export interface CustomerDoc extends BaseDoc {
   phone?: string;
   email?: string;
   notes?: string;
+  kidsDob?: string; // ISO date for child's DOB (optional)
   loyaltyPoints?: number;
   totalSpend?: number;
 }
@@ -68,6 +69,7 @@ export interface InvoiceDoc extends BaseDoc {
   payments: PaymentRecord[];
   balanceDue: number;
   cashierUserId: string;
+  cashierName?: string;
   status: 'paid' | 'partial' | 'unpaid' | 'void';
   issuedAt: string; // sale timestamp
 }
