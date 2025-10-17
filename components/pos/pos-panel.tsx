@@ -45,27 +45,128 @@ export function PosPanel() {
     listProducts().then(setAllProducts).catch(() => undefined);
   }, []);
 
-  // Draft persistence (load)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("pos.cart.v1");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed?.cart)) setCart(parsed.cart);
-        if (typeof parsed?.billDiscount === 'number') setBillDiscount(parsed.billDiscount);
-        if (parsed?.billDiscountMode === 'amount' || parsed?.billDiscountMode === 'percent') setBillDiscountMode(parsed.billDiscountMode);
-        if (parsed?.paymentMethod) setPaymentMethod(parsed.paymentMethod);
-        if (typeof parsed?.paymentRef === 'string') setPaymentRef(parsed.paymentRef);
-      }
-    } catch { /* ignore */ }
-  }, []);
+  // Draft persistence (v2) — save minimal productId-based lines and rehydrate from catalog
+  type CartDraftLine = { productId: string; qty: number; itemDiscount?: number; itemDiscountMode?: 'amount' | 'percent' };
+  type PosDraftV2 = {
+    version: 2;
+    cashierUserId?: string;
+    cart: CartDraftLine[];
+    billDiscount: number;
+    billDiscountMode: 'amount' | 'percent';
+    paymentMethod: 'cash' | 'card' | 'upi' | 'wallet';
+    paymentRef: string;
+    custPhone: string;
+    custName: string;
+    custEmail: string;
+    custKidsDob: string;
+    updatedAt: string; // ISO
+  };
 
-  // Draft persistence (save)
-  useEffect(() => {
+  const DRAFT_KEY_V1 = "pos.cart.v1";
+  const DRAFT_KEY_V2 = "pos.cart.v2";
+  const loadedRef = useRef(false);
+
+  function loadDraftOnce(products: ProductDoc[], uid?: string | null) {
+    if (loadedRef.current) return;
     try {
-      localStorage.setItem("pos.cart.v1", JSON.stringify({ cart, billDiscount, billDiscountMode, paymentMethod, paymentRef, custPhone, custName, custEmail, custKidsDob }));
+      // Prefer v2
+      const rawV2 = localStorage.getItem(DRAFT_KEY_V2);
+      if (rawV2) {
+        const d = JSON.parse(rawV2) as Partial<PosDraftV2>;
+        // If draft is tied to another cashier, ignore
+        if (d && (!d.cashierUserId || !uid || d.cashierUserId === uid)) {
+          if (Array.isArray(d.cart)) {
+            const lines: CartLine[] = d.cart
+              .map((cl) => {
+                const p = products.find((x) => x.id === cl.productId);
+                if (!p) return null;
+                return { product: p, qty: Math.max(1, Number(cl.qty || 1)), itemDiscount: cl.itemDiscount, itemDiscountMode: cl.itemDiscountMode } as CartLine;
+              })
+              .filter(Boolean) as CartLine[];
+            if (lines.length) setCart(lines);
+          }
+          if (d.billDiscount != null) setBillDiscount(Number(d.billDiscount) || 0);
+          if (d.billDiscountMode === 'amount' || d.billDiscountMode === 'percent') setBillDiscountMode(d.billDiscountMode);
+          if (d.paymentMethod === 'cash' || d.paymentMethod === 'card' || d.paymentMethod === 'upi' || d.paymentMethod === 'wallet') setPaymentMethod(d.paymentMethod);
+          if (typeof d.paymentRef === 'string') setPaymentRef(d.paymentRef);
+          if (typeof d.custPhone === 'string') setCustPhone(d.custPhone);
+          if (typeof d.custName === 'string') setCustName(d.custName);
+          if (typeof d.custEmail === 'string') setCustEmail(d.custEmail);
+          if (typeof d.custKidsDob === 'string') setCustKidsDob(d.custKidsDob);
+          loadedRef.current = true;
+          return;
+        }
+      }
+      // Migrate from v1 (stored full product objects)
+      const rawV1 = localStorage.getItem(DRAFT_KEY_V1);
+      if (rawV1) {
+        type V1CartLine = { product?: Partial<ProductDoc> & { id?: string }; qty?: number; itemDiscount?: number; itemDiscountMode?: 'amount' | 'percent' };
+        type V1Draft = { cart?: V1CartLine[]; billDiscount?: number; billDiscountMode?: 'amount' | 'percent'; paymentMethod?: 'cash' | 'card' | 'upi' | 'wallet'; paymentRef?: string; custPhone?: string; custName?: string; custEmail?: string; custKidsDob?: string };
+        const d = JSON.parse(rawV1) as V1Draft;
+        if (d) {
+          // cart may contain full product objects
+          if (Array.isArray(d.cart)) {
+            const lines: CartLine[] = d.cart
+              .map((l) => {
+                const pid = l?.product?.id as string | undefined;
+                const p = pid ? products.find((x) => x.id === pid) : undefined;
+                if (!p) return null;
+                const qty = Math.max(1, Number(l?.qty || 1));
+                const itemDiscount = typeof l?.itemDiscount === 'number' ? l.itemDiscount : undefined;
+                const itemDiscountMode: 'amount' | 'percent' = l?.itemDiscountMode === 'percent' ? 'percent' : 'amount';
+                return { product: p, qty, itemDiscount, itemDiscountMode } as CartLine;
+              })
+              .filter((x): x is CartLine => Boolean(x));
+            if (lines.length) setCart(lines);
+          }
+          if (typeof d.billDiscount === 'number') setBillDiscount(d.billDiscount);
+          if (d.billDiscountMode === 'amount' || d.billDiscountMode === 'percent') setBillDiscountMode(d.billDiscountMode);
+          if (d.paymentMethod) setPaymentMethod(d.paymentMethod);
+          if (typeof d.paymentRef === 'string') setPaymentRef(d.paymentRef);
+          if (typeof d.custPhone === 'string') setCustPhone(d.custPhone);
+          if (typeof d.custName === 'string') setCustName(d.custName);
+          if (typeof d.custEmail === 'string') setCustEmail(d.custEmail);
+          if (typeof d.custKidsDob === 'string') setCustKidsDob(d.custKidsDob);
+          // Do not mark loaded to allow a later v2 to override if present, but avoid loops
+          loadedRef.current = true;
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    loadedRef.current = true;
+  }
+
+  // Load draft when products and user are available (rehydration needs products list)
+  useEffect(() => {
+    loadDraftOnce(allProducts, user?.uid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allProducts.length, user?.uid]);
+
+  // Draft persistence (save as v2). Avoid saving until initial load finished to prevent overwriting.
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    try {
+      const draft: PosDraftV2 = {
+        version: 2,
+        cashierUserId: user?.uid,
+        cart: cart.map((l) => ({ productId: l.product.id!, qty: l.qty, itemDiscount: l.itemDiscount, itemDiscountMode: l.itemDiscountMode })),
+        billDiscount,
+        billDiscountMode,
+        paymentMethod,
+        paymentRef,
+        custPhone,
+        custName,
+        custEmail,
+        custKidsDob,
+        updatedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(DRAFT_KEY_V2, JSON.stringify(draft));
+      // Clean up old v1 to avoid confusion
+      localStorage.removeItem(DRAFT_KEY_V1);
     } catch { /* ignore */ }
-  }, [cart, billDiscount, billDiscountMode, paymentMethod, paymentRef, custPhone, custName, custEmail, custKidsDob]);
+  }, [cart, billDiscount, billDiscountMode, paymentMethod, paymentRef, custPhone, custName, custEmail, custKidsDob, user?.uid]);
 
   const lineDiscount = useCallback((l: CartLine) => {
     const base = l.product.unitPrice * l.qty;
@@ -293,6 +394,7 @@ export function PosPanel() {
       setCustEmail("");
       setCustKidsDob("");
       setCustFound(null);
+      try { localStorage.removeItem(DRAFT_KEY_V2); localStorage.removeItem(DRAFT_KEY_V1); } catch { }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       showToast('error', `Checkout failed: ${msg}`);
@@ -497,7 +599,7 @@ export function PosPanel() {
           <Input placeholder="Reference / Txn ID (optional)" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} />
         </div>
         <div className="flex gap-2">
-          <Button className="flex-1" variant="outline" disabled={cart.length === 0} onClick={() => { setCart([]); setBillDiscount(0); setPaymentRef(""); showToast('success', 'Draft cleared'); }}>Clear Draft</Button>
+          <Button className="flex-1" variant="outline" disabled={cart.length === 0} onClick={() => { setCart([]); setBillDiscount(0); setPaymentRef(""); setCustPhone(""); setCustName(""); setCustEmail(""); setCustKidsDob(""); try { localStorage.removeItem(DRAFT_KEY_V2); localStorage.removeItem(DRAFT_KEY_V1); } catch { }; showToast('success', 'Draft cleared'); }}>Clear Draft</Button>
           <Button className="flex-1" disabled={cart.length === 0} onClick={onCheckout}>Confirm Payment & Checkout</Button>
         </div>
         {toast && (
