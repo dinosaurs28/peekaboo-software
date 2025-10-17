@@ -94,8 +94,8 @@ export function Topbar() {
                   {lowItems.map((p) => (
                     <li key={p.id} className="flex items-start justify-between gap-2 text-sm">
                       <div className="min-w-0">
-                        <div className="font-medium truncate">{p.name}</div>
-                        <div className="text-xs text-muted-foreground truncate">SKU {p.sku} • Stock {p.stock}{p.reorderLevel != null ? ` / ≤ ${p.reorderLevel}` : ''}</div>
+                        <div className="font-medium truncate">Low Stock</div>
+                        <div className="text-xs text-muted-foreground truncate">{p.name}</div>
                       </div>
                       <div className="shrink-0">
                         {role === "admin" ? (
