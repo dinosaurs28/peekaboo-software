@@ -7,6 +7,8 @@ import { getProduct } from "@/lib/products";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ProductDoc } from "@/lib/models";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function EditProductPage() {
   const { user, role, loading } = useAuth();
@@ -46,7 +48,11 @@ export default function EditProductPage() {
             <p>Loading…</p>
           ) : (
             <>
-              <h1 className="text-xl font-semibold">Edit Product</h1>
+              <div className="flex items-center justify-between">
+                <Link href="/products"><Button variant="outline">← Back</Button></Link>
+                <h1 className="text-xl font-semibold">Edit Product</h1>
+                <div />
+              </div>
               <ProductForm mode="edit" initial={{
                 id: product.id,
                 name: product.name,
@@ -55,7 +61,6 @@ export default function EditProductPage() {
                 stock: product.stock,
                 active: product.active,
                 category: product.category,
-                barcode: product.barcode,
                 hsnCode: product.hsnCode,
                 costPrice: product.costPrice,
                 reorderLevel: product.reorderLevel,
