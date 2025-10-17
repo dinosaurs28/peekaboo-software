@@ -31,7 +31,6 @@ export interface CustomerDoc extends BaseDoc {
 export interface ProductDoc extends BaseDoc {
   name: string;
   sku: string; // internal SKU
-  barcode?: string; // linked barcode code
   category?: string;
   hsnCode?: string; // HSN/SAC code for GST
   unitPrice: number; // stored as number in smallest currency unit? (decide) currently decimal number
