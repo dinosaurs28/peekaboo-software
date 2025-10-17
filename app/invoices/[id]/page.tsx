@@ -55,6 +55,7 @@ export default function InvoiceDetailsPage() {
         <Topbar />
         <main className="flex-1 p-6 space-y-4">
           <div className="flex items-center justify-between">
+            <Button variant="outline" onClick={() => { window.location.href = "/invoices"; }}>← Back</Button>
             <h1 className="text-xl font-semibold">Invoice {invoice?.invoiceNumber || id}</h1>
             {canPrint && (
               <Button onClick={() => window.print()}>Print</Button>
