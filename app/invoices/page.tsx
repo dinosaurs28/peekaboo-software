@@ -107,7 +107,7 @@ export default function InvoicesPage() {
                     <TableRow
                       key={inv.id}
                       className="cursor-pointer hover:bg-muted/40"
-                      onClick={() => window.alert(`Invoice ${inv.invoiceNumber} clicked. TODO: details view/print.`)}
+                      onClick={() => { window.location.href = `/invoices/${inv.id}`; }}
                     >
                       <TableCell>{inv.invoiceNumber}</TableCell>
                       <TableCell>{new Date(inv.issuedAt).toLocaleString()}</TableCell>
@@ -115,7 +115,7 @@ export default function InvoicesPage() {
                       <TableCell className="text-right">₹{(inv.discountTotal ?? 0).toFixed(2)}</TableCell>
                       <TableCell className="text-right font-medium">₹{inv.grandTotal.toFixed(2)}</TableCell>
                       <TableCell>{inv.status}</TableCell>
-                      <TableCell>{inv.cashierUserId.slice(0, 6)}</TableCell>
+                      <TableCell>{inv.cashierName || inv.cashierUserId.slice(0, 6)}</TableCell>
                     </TableRow>
                   ))}
                   {invoices.length === 0 && !invoicesLoading && (
