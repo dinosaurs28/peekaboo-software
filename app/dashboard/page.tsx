@@ -103,8 +103,14 @@ export default function DashboardPage() {
                 <StatCard label="New Customers" value={newCustomers} subtext="Last 30 days" icon={<Users className="h-5 w-5" />} />
                 <StatCard label="Expenses" value={`₹${expenses.toFixed(2)}`} subtext="COGS · Last 30 days" icon={<Wallet className="h-5 w-5" />} />
               </div>
-              {role === "admin" && <LowStockAlerts />}
-              <RecentInvoices />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <RecentInvoices />
+                </div>
+                <div>
+                  <LowStockAlerts />
+                </div>
+              </div>
             </>
           )}
         </main>
