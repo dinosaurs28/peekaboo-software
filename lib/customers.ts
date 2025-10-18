@@ -1,6 +1,6 @@
 "use client";
 import { db } from "@/lib/firebase";
-import { collection, doc, getDocs, getDoc, query, where, limit, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, query, where, limit, addDoc, serverTimestamp, updateDoc, orderBy } from "firebase/firestore";
 import type { CustomerDoc } from "@/lib/models";
 import { COLLECTIONS } from "@/lib/models";
 
@@ -30,6 +30,14 @@ export async function findCustomerByPhone(phone: string): Promise<CustomerDoc | 
   if (snap.empty) return null;
   const d = snap.docs[0];
   return toCustomerDoc(d.id, d.data() as Record<string, unknown>);
+}
+
+export async function listCustomers(): Promise<CustomerDoc[]> {
+  if (!db) return [];
+  const col = collection(db, COLLECTIONS.customers);
+  const qy = query(col, orderBy('name'));
+  const snap = await getDocs(qy);
+  return snap.docs.map(d => toCustomerDoc(d.id, d.data() as Record<string, unknown>));
 }
 
 export type UpsertCustomerInput = {
