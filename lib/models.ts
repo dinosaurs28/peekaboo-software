@@ -82,6 +82,15 @@ export interface OfferDoc extends BaseDoc {
   discountType?: 'percentage' | 'amount';
   discountValue?: number; // meaning depends on type
   productIds?: string[]; // targeted products
+  // Extended targeting and rules
+  categoryNames?: string[]; // target by product.category name
+  ruleType?: 'flat' | 'percentage' | 'bogoSameItem'; // engine selector; flat/percentage mirror discountType, bogo uses buy/get
+  buyQty?: number; // for BOGO same item
+  getQty?: number; // for BOGO same item
+  dobMonthOnly?: boolean; // apply only if customer's (kid's) DOB month matches current
+  eventName?: string; // label like Diwali, Back-to-School
+  priority?: number; // lower number = higher priority
+  exclusive?: boolean; // if true, do not combine/stack
 }
 
 // Category management
