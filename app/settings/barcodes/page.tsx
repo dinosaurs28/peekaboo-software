@@ -10,6 +10,8 @@ import jsPDF from "jspdf";
 import { listProducts, incrementPrintedCount } from "@/lib/products";
 import type { ProductDoc } from "@/lib/models";
 import { categoryCode } from "@/lib/models";
+import { listCategories } from "@/lib/categories";
+import type { CategoryDoc } from "@/lib/models";
 
 // Contract:
 // - Admin only access; others redirected to /login or /dashboard
@@ -17,9 +19,15 @@ import { categoryCode } from "@/lib/models";
 // - Render preview of labels; Export to PDF (A4 3x10 grid by default)
 // - After successful export, increment product.printedCount by qty
 
-function encodeBarcode(p: ProductDoc): string {
-  const cat = categoryCode(p.category);
-  return `PB|${cat}|${p.sku}`;
+function encodeBarcode(p: ProductDoc, categories: CategoryDoc[]): string {
+  // Prefer managed Category.code when Product.category matches a category name
+  const catName = p.category;
+  let code = categoryCode(catName);
+  if (catName) {
+    const match = categories.find(c => c.active && c.name.toLowerCase() === catName.toLowerCase());
+    if (match?.code) code = match.code.toUpperCase();
+  }
+  return `PB|${code}|${p.sku}`;
 }
 
 type LabelSpec = {
@@ -53,6 +61,7 @@ export default function BarcodeGeneratorPage() {
   const [qty, setQty] = useState<number>(1);
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [categories, setCategories] = useState<CategoryDoc[]>([]);
 
   useEffect(() => {
     if (loading) return;
@@ -64,10 +73,11 @@ export default function BarcodeGeneratorPage() {
       router.replace("/dashboard");
       return;
     }
-    // Load products for selection
-    listProducts().then((list) => {
+    // Load products and categories for selection and code mapping
+    Promise.all([listProducts(), listCategories()]).then(([list, cats]) => {
       setProducts(list);
       if (list.length > 0) setProductId(list[0].id || "");
+      setCategories(cats.filter(c => c.active));
     }).catch((e) => console.error(e));
   }, [loading, user, role, router]);
 
@@ -76,7 +86,7 @@ export default function BarcodeGeneratorPage() {
   useEffect(() => {
     // Draw preview for first label
     if (!selected) return;
-    const code = encodeBarcode(selected);
+    const code = encodeBarcode(selected, categories);
     const canvas = canvasRef.current;
     if (!canvas) return;
     try {
@@ -93,7 +103,7 @@ export default function BarcodeGeneratorPage() {
     try {
       const spec = DEFAULT_SPEC;
       const doc = new jsPDF({ unit: "mm", format: "a4" });
-      const code = encodeBarcode(selected);
+      const code = encodeBarcode(selected, categories);
 
       // Pre-render barcode to canvas to get image data
       const tempCanvas = document.createElement("canvas");
@@ -195,7 +205,7 @@ export default function BarcodeGeneratorPage() {
                 <>
                   <div className="text-sm mb-2 font-medium truncate max-w-full">{selected.name}</div>
                   <canvas ref={canvasRef} className="bg-white rounded" />
-                  <div className="text-xs text-muted-foreground mt-2">{encodeBarcode(selected)}</div>
+                  <div className="text-xs text-muted-foreground mt-2">{encodeBarcode(selected, categories)}</div>
                 </>
               ) : (
                 <div className="text-xs text-muted-foreground">Select a product to preview</div>
