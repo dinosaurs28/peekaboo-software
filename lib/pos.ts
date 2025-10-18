@@ -2,7 +2,7 @@
 import { db } from "@/lib/firebase";
 import { collection, serverTimestamp, runTransaction, doc, increment } from "firebase/firestore";
 import type { InvoiceDoc } from "@/lib/models";
-import { COLLECTIONS } from "@/lib/models";
+import { COLLECTIONS, GoodsReceiptDoc, GoodsReceiptLine } from "@/lib/models";
 
 export type CheckoutInput = {
   lines: Array<{ productId: string; name: string; qty: number; unitPrice: number; lineDiscount?: number }>;
@@ -70,3 +70,93 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
 
 // Trivial export to ensure module resolution picks up this file
 export const __POS__MODULE = true;
+
+// Inventory: generic stock adjustment with log entry
+export type AdjustReason = 'sale' | 'receive' | 'correction' | 'stocktake' | 'return';
+export async function adjustStock(params: {
+  productId: string;
+  delta: number; // + for receive, - for deduction
+  reason: AdjustReason;
+  userId?: string;
+  note?: string;
+  unitCost?: number;
+  relatedInvoiceId?: string;
+  relatedReceiptId?: string;
+}): Promise<void> {
+  if (!db) throw new Error("Firestore not initialized");
+  const dbx = db!;
+  await runTransaction(dbx, async (tx) => {
+    const pRef = doc(dbx, COLLECTIONS.products, params.productId);
+    // Use atomic increment without read for speed; logs will not store from/to in this minimal version
+    tx.update(pRef, { stock: increment(params.delta), updatedAt: serverTimestamp() });
+    const logRef = doc(collection(dbx, COLLECTIONS.inventoryLogs));
+    const logType: 'sale' | 'purchase' | 'return' | 'adjustment' | 'damage' =
+      params.reason === 'sale' ? 'sale'
+      : params.reason === 'receive' ? 'purchase'
+      : params.reason === 'return' ? 'return'
+      : 'adjustment';
+    tx.set(logRef, {
+      productId: params.productId,
+      quantityChange: params.delta,
+      type: logType,
+      reason: params.reason,
+      userId: params.userId ?? 'system',
+      note: params.note ?? null,
+      relatedInvoiceId: params.relatedInvoiceId ?? null,
+      relatedReceiptId: params.relatedReceiptId ?? null,
+      unitCost: params.unitCost ?? null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+// Inventory: receive multiple items (Option E backend) and create a GoodsReceipt document
+export async function receiveStock(params: {
+  createdByUserId: string;
+  supplierName?: string;
+  supplierCode?: string;
+  docNo?: string;
+  docDate?: string; // ISO
+  note?: string;
+  lines: GoodsReceiptLine[]; // { productId, sku, name, qty, unitCost? }
+}): Promise<string> {
+  if (!db) throw new Error("Firestore not initialized");
+  const dbx = db!;
+  const now = new Date().toISOString();
+  const receiptId = await runTransaction(dbx, async (tx) => {
+    const recRef = doc(collection(dbx, COLLECTIONS.goodsReceipts));
+    const receipt: Omit<GoodsReceiptDoc, 'id'> = {
+      supplierName: params.supplierName,
+      supplierCode: params.supplierCode,
+      docNo: params.docNo,
+      docDate: params.docDate,
+      note: params.note,
+      createdByUserId: params.createdByUserId,
+      lines: params.lines,
+      createdAt: now,
+      updatedAt: now,
+    };
+    tx.set(recRef, { ...receipt, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    // Apply increments and logs per line
+    for (const line of params.lines) {
+      const pRef = doc(dbx, COLLECTIONS.products, line.productId);
+      tx.update(pRef, { stock: increment(line.qty), updatedAt: serverTimestamp() });
+      const logRef = doc(collection(dbx, COLLECTIONS.inventoryLogs));
+      tx.set(logRef, {
+        productId: line.productId,
+        quantityChange: line.qty,
+        type: 'purchase',
+        reason: 'receive',
+        userId: params.createdByUserId,
+        note: params.note ?? null,
+        relatedReceiptId: recRef.id,
+        unitCost: line.unitCost ?? null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    return recRef.id;
+  });
+  return receiptId;
+}

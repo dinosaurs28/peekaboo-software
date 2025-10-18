@@ -84,6 +84,33 @@ export interface OfferDoc extends BaseDoc {
   productIds?: string[]; // targeted products
 }
 
+// Category management
+export interface CategoryDoc extends BaseDoc {
+  name: string;
+  code: string; // short uppercase code used in barcodes (e.g., CLO)
+  description?: string;
+  active: boolean;
+}
+
+// Goods receipt (group of received items)
+export interface GoodsReceiptLine {
+  productId: string;
+  sku: string;
+  name: string;
+  qty: number;
+  unitCost?: number;
+}
+
+export interface GoodsReceiptDoc extends BaseDoc {
+  supplierName?: string;
+  supplierCode?: string;
+  docNo?: string;
+  docDate?: string; // ISO date
+  note?: string;
+  createdByUserId: string;
+  lines: GoodsReceiptLine[];
+}
+
 export interface InventoryLogDoc extends BaseDoc {
   productId: string;
   type: 'adjustment' | 'sale' | 'purchase' | 'return' | 'damage';
@@ -129,6 +156,8 @@ export const COLLECTIONS = {
   invoices: 'Invoices',
   offers: 'Offers',
   inventoryLogs: 'InventoryLogs',
+  categories: 'Categories',
+  goodsReceipts: 'GoodsReceipts',
   barcodes: 'Barcodes',
   reports: 'Reports',
   settings: 'Settings'
