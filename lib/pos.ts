@@ -1,12 +1,14 @@
 "use client";
 import { db } from "@/lib/firebase";
 import { collection, serverTimestamp, runTransaction, doc, increment } from "firebase/firestore";
-import type { InvoiceDoc } from "@/lib/models";
+import type { InvoiceDoc, PaymentRecord } from "@/lib/models";
 import { COLLECTIONS, GoodsReceiptDoc, GoodsReceiptLine } from "@/lib/models";
 
 export type CheckoutInput = {
   lines: Array<{ productId: string; name: string; qty: number; unitPrice: number; lineDiscount?: number }>;
   billDiscount?: number;
+  // Either provide payments[] for split, or paymentMethod for single
+  payments?: PaymentRecord[];
   paymentMethod?: 'cash' | 'card' | 'upi' | 'wallet';
   paymentReferenceId?: string;
   cashierUserId?: string;
@@ -18,9 +20,29 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
   if (!db) throw new Error("Firestore not initialized");
   const dbx = db!;
   const nowIso = new Date().toISOString();
-  const subtotal = input.lines.reduce((s, l) => s + l.unitPrice * l.qty - (l.lineDiscount ?? 0), 0);
+  // Compute per-line net and proportional bill discount for tax base
+  const lineNets = input.lines.map(l => ({
+    ...l,
+    net: l.unitPrice * l.qty - (l.lineDiscount ?? 0),
+  }));
+  const subtotal = lineNets.reduce((s, l) => s + l.net, 0);
   const billDisc = input.billDiscount ?? 0;
-  const grandTotal = Math.max(0, subtotal - billDisc);
+  // Distribute bill discount proportionally across lines for tax computation
+  const totalBase = Math.max(1, subtotal);
+  const linesWithBillShare = lineNets.map(l => ({
+    ...l,
+    billShare: (billDisc * (l.net / totalBase)),
+  }));
+  // Tax per line (if taxRatePct exists on line source), invoice lines here may not carry taxRatePct; caller should embed it in name or we compute 0
+  // Note: We accept optional taxRatePct in a widened shape; we won't change the CheckoutInput type to keep API minimal
+  const linesWithTax = linesWithBillShare.map((l: any) => {
+    const taxableBase = Math.max(0, l.net - l.billShare);
+    const taxRate = typeof l.taxRatePct === 'number' ? l.taxRatePct : 0;
+    const tax = taxableBase * (taxRate / 100);
+    return { ...l, taxRatePct: taxRate, lineTax: tax };
+  });
+  const taxTotal = linesWithTax.reduce((s: number, l: any) => s + l.lineTax, 0);
+  const grandTotal = Math.max(0, subtotal - billDisc + taxTotal);
   const method = input.paymentMethod ?? 'cash';
   const refId = input.paymentReferenceId;
   const cashierUserId = input.cashierUserId ?? 'current-user';
@@ -28,23 +50,54 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
 
   // Transaction: decrement stock for each product and then create invoice
   const invoiceId = await runTransaction(dbx, async (tx) => {
-    // Decrement stock
+    // Prepare invoice reference first to use id in logs
+    const invRef = doc(collection(dbx, COLLECTIONS.invoices));
+
+    // Sequential invoice number (prefix + zero-padded counter) from Settings/app
+    const settingsRef = doc(dbx, COLLECTIONS.settings, 'app');
+    const settingsSnap = await tx.get(settingsRef);
+    let prefix = 'INV';
+    let nextSeq = 1;
+    if (settingsSnap.exists()) {
+      const s = settingsSnap.data() as any;
+      prefix = typeof s.invoicePrefix === 'string' && s.invoicePrefix.trim() ? s.invoicePrefix.trim() : 'INV';
+      nextSeq = Number(s.nextInvoiceSequence ?? 1) || 1;
+    }
+    const seqStr = String(nextSeq).padStart(6, '0');
+    const invoiceNumber = `${prefix}-${seqStr}`;
+    // Bump counter
+    tx.set(settingsRef, { invoicePrefix: prefix, nextInvoiceSequence: nextSeq + 1, updatedAt: serverTimestamp() }, { merge: true });
+
+    // Decrement stock and create inventory logs per line
     for (const l of input.lines) {
-  const pRef = doc(dbx, COLLECTIONS.products, l.productId);
-      // We simply decrement; if we need to enforce non-negative stock, fetch current and check
+      const pRef = doc(dbx, COLLECTIONS.products, l.productId);
       tx.update(pRef, { stock: increment(-l.qty), updatedAt: serverTimestamp() });
+      const logRef = doc(collection(dbx, COLLECTIONS.inventoryLogs));
+      tx.set(logRef, {
+        productId: l.productId,
+        quantityChange: -l.qty,
+        type: 'sale',
+        reason: 'sale',
+        userId: input.cashierUserId ?? 'current-user',
+        relatedInvoiceId: invRef.id,
+        unitCost: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
     }
 
     // Create invoice document
     const inv: Omit<InvoiceDoc, 'id'> = {
-      invoiceNumber: "TEMP-" + Date.now(),
+      invoiceNumber,
       // customerId omitted unless provided
-      items: input.lines.map((l) => ({ productId: l.productId, name: l.name, quantity: l.qty, unitPrice: l.unitPrice, discountAmount: l.lineDiscount ?? 0 })),
+      items: linesWithTax.map((l: any) => ({ productId: l.productId, name: l.name, quantity: l.qty, unitPrice: l.unitPrice, taxRatePct: l.taxRatePct || undefined, discountAmount: l.lineDiscount ?? 0 })),
       subtotal,
-      taxTotal: 0,
+      taxTotal,
       discountTotal: billDisc,
       grandTotal,
-      payments: [{ method, amount: grandTotal, ...(refId ? { referenceId: refId } : {}) }],
+      payments: (Array.isArray(input.payments) && input.payments.length > 0)
+        ? input.payments
+        : [{ method, amount: grandTotal, ...(refId ? { referenceId: refId } : {}) }],
       balanceDue: 0,
       cashierUserId,
       ...(cashierName ? { cashierName } : {}),
@@ -54,8 +107,15 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       updatedAt: nowIso,
     };
 
+    // Validate payments sum if provided
+    if (Array.isArray(input.payments) && input.payments.length > 0) {
+      const paid = input.payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      if (Math.abs(paid - grandTotal) > 0.01) {
+        throw new Error(`Split payments do not sum to total. Paid ${paid.toFixed(2)} vs ${grandTotal.toFixed(2)}`);
+      }
+    }
+
     // Create invoice inside the transaction using tx.set
-    const invRef = doc(collection(dbx, COLLECTIONS.invoices));
     tx.set(invRef, {
       ...inv,
       ...(input.customerId ? { customerId: input.customerId } : {}),
