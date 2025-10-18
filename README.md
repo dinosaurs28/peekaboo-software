@@ -105,7 +105,7 @@ What’s done
 - Phase 3: POS & Billing
 	- POS panel: fast scan/search, multi-item cart, item-level and bill-level discounts, keyboard shortcuts.
 	- GST calculation per line (taxRatePct) with proportional bill-discount allocation; invoice totals reflect tax.
-	- Invoice creation with cashier/customer linkage; invoice list + details; admin print button on details page.
+	- Invoice creation with cashier/customer linkage; invoice list + details; admin print for A4 and 80mm thermal receipt.
 	- Multi-payment + split payments (Cash/Card/UPI/Wallet) with validation.
 - Phase 4: Customers & Offers
 	- Customer capture in POS (create-if-missing by phone); customers list with search; customer detail with real-time purchase history + metrics (total spend, visits, last purchase, top items).
@@ -118,14 +118,12 @@ What’s done
 
 Known gaps (outside Phase 6)
 - Phase 3
-	- Printable/PDF invoice (dedicated layout) and email-send not yet implemented.
-	- Thermal 80mm receipt template not yet implemented.
+	- PDF generation and email-send are optional and not implemented by design (browser print used).
 - Phase 5
 	- Stock report page/export (current stock and low-stock CSV) not yet implemented.
 	- XLSX export option (optional) not implemented; CSV provided.
 - Cross-cutting
 	- Composite Firestore indexes (create when prompted by console for customerId+issuedAt, etc.).
-	- Sequential invoice numbering (currently TEMP- timestamp).
 
 ## Testing brief (End-to-end checklist)
 
@@ -161,7 +159,8 @@ Offers
 
 Invoices
 - Cashier sees own invoices; Admin sees all; filters (date/status/cashier) work; index prompts handled.
-- Details page displays lines, discounts, totals; Admin Print works (browser print); URL back to list works.
+- Details page displays lines, discounts, totals; Admin Print A4 and Print 80mm open in new tabs and auto-open print dialog; URL back to list works.
+- Verify invoice numbers are sequential (PREFIX-000001, …). Confirm Settings/app { invoicePrefix, nextInvoiceSequence } increments on each checkout.
 
 Reports
 - Sales report: choose range and group; table shows periods, invoice counts, totals.
@@ -175,9 +174,8 @@ Resilience & permissions
 ## Next implementations (success-critical roadmap)
 
 1) Invoices & receipts
-- Dedicated printable invoice (branded) and PDF generation; email option.
-- 80mm thermal receipt template with concise layout (store/txn summary, QR optional).
-- Sequential invoice numbering using a server-side counter doc (transactionally increment).
+- Store branding on print templates (logo, address, GSTIN) driven from Settings (Business Profile).
+- Optional: PDF generation and email option (if needed later).
 
 2) Stock reports
 - Reports → Stock: Current Stock CSV and Low-Stock CSV (filters by category, reorder only).
@@ -186,6 +184,12 @@ Resilience & permissions
 3) Data integrity & security
 - Firestore Security Rules v1: role-based read/write per collection; validators (e.g., non-negative stock, price limits); deny role escalation.
 - Composite indexes for common queries (customerId+issuedAt desc, issuedAt+status, issuedAt+cashierUserId).
+
+6) Returns/voids & after-sales
+- Add returns/void/exchange flow that reverses stock and annotates invoices; write inventory logs accordingly.
+
+7) Loyalty and engagement (optional)
+- Basic loyalty points accrual on net spend and redemption at POS; show balance on customer detail and POS.
 
 4) UX polish (Phase 6 alignment)
 - Mobile-first POS and dashboard layout tweaks; sticky totals panel; larger touch targets.
