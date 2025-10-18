@@ -95,109 +95,109 @@ Seed demo data for testing
 
 ✅ Output: Complete app feature-ready for testing cycle.
 
-## Yet To Implement
-Here’s a concise gap analysis against your README scope, plus a suggested enhancement list and a fresh testing brief you can use for a sprint.
+## Implementation status (Phases 2–5)
 
-What’s left to do (by scope)
+What’s done
+- Phase 2: Products, Categories, Inventory
+	- Product CRUD with SKU/HSN/price/tax; live Categories (list/new/edit); real-time inventory tracking with transactional adjustments; low-stock alerts on dashboard.
+	- Barcode Generator (single/bulk) with A4 label PDF; Category code included in PB|CAT|SKU.
+	- Inventory Logs written on sales and receiving; admin viewer with filters.
+- Phase 3: POS & Billing
+	- POS panel: fast scan/search, multi-item cart, item-level and bill-level discounts, keyboard shortcuts.
+	- GST calculation per line (taxRatePct) with proportional bill-discount allocation; invoice totals reflect tax.
+	- Invoice creation with cashier/customer linkage; invoice list + details; admin print button on details page.
+	- Multi-payment + split payments (Cash/Card/UPI/Wallet) with validation.
+- Phase 4: Customers & Offers
+	- Customer capture in POS (create-if-missing by phone); customers list with search; customer detail with real-time purchase history + metrics (total spend, visits, last purchase, top items).
+	- Offers module (admin): create/edit/list with active dates, product/category/bill targeting, flat/%/BOGO(same item), DOB-month-only, event tag, priority/exclusive.
+	- POS: Active offers panel, apply/clear; auto-alert suggests best applicable offer based on cart and DOB.
+- Phase 5: Reports & Accounting
+	- Sales report grouped by day/week/month.
+	- Payment Mode report.
+	- Accounting CSV export (date range, category, payment mode) with Date, Invoice No., SKU, HSN, Tax, Discounts, Payment Mode, Customer ID.
 
-Phase 2: Product & Inventory
-Inventory tracking
-Inventory adjustment UI (manual increase/decrease) and transactional helper.
-Inventory logs (who/when/why) for audit.
-Category management page (optional; categories are used but not managed separately).
+Known gaps (outside Phase 6)
+- Phase 3
+	- Printable/PDF invoice (dedicated layout) and email-send not yet implemented.
+	- Thermal 80mm receipt template not yet implemented.
+- Phase 5
+	- Stock report page/export (current stock and low-stock CSV) not yet implemented.
+	- XLSX export option (optional) not implemented; CSV provided.
+- Cross-cutting
+	- Composite Firestore indexes (create when prompted by console for customerId+issuedAt, etc.).
+	- Sequential invoice numbering (currently TEMP- timestamp).
 
-Phase 3: POS & Billing
-Tax handling (GST slab calculation in cart lines and invoice totals).
-Invoice outputs
-Printable/PDF invoice template (admin): dedicated layout vs window.print.
-Email invoice to customer.
-Payments
-Multi-payment (pay with cash+UPI split).
-Split payments UX and persistence.
-Extras (optional but useful)
-Receipt template for thermal printers (80mm).
+## Testing brief (End-to-end checklist)
 
-Phase 4: Customer & Offers
-Customer CRUD (full list, view, edit).
-Customer purchase history view.
-Offers module
-Offer rules engine (%, flat, BOGO, item/category/date rules).
-POS auto-alert for active offers and application.
+Setup & auth
+- App boots without “Internal Server Error”; env vars loaded.
+- Login as Admin and Cashier; routes and visibility match roles.
 
-Phase 5: Reports & Accounting
-Sales reports (daily/weekly/monthly).
-Stock report (current, movements, low-stock export).
-Payment mode report.
-Accounting CSV/XLSX export with required columns and filters.
+Products & categories
+- Create/edit/delete product; SKU unique in practice; taxRatePct saved.
+- Create/edit categories; Product form category dropdown shows live categories.
 
-Phase 6: Polish & Integrations
-Mobile-first refinements (dashboard and POS).
-Invoice template customization (branding).
-Final security & role permissions (Firestore Rules hardened).
-Seed demo data script.
-Cross-cutting left to finish
-Firestore Security Rules: enforce role-based access (admin-only mutations, cashier scope, deny role escalation).
-Composite indexes for invoices queries (remove fallback).
-Error monitoring/analytics (optional).
+Inventory & barcodes
+- Receive stock via Settings → Receive; stock increments; GoodsReceipt created; logs written per line.
+- POS sale decrements stock transactionally; sale logs linked to invoice.
+- Dashboard low-stock panel updates in real-time after adjustments.
+- Generate A4 PDF labels; scan in POS: PB|CAT|SKU decodes correctly.
 
-## Robustness upgrades worth considering
+POS & billing
+- Scan valid/invalid codes: success/error toasts; input focus preserved.
+- Search by name/SKU; add/merge lines; +/- and Delete keys work on selected line.
+- Item discount: switch ₹/% and verify math per line.
+- Bill discount: switch ₹/% and verify totals.
+- GST: set product taxRatePct; verify line tax and invoice taxTotal; bill-discount reduces tax base proportionally.
+- Split payments: enable, add rows, amounts sum to total; validation blocks mismatch; single payment still works.
 
-Data integrity and security
-Comprehensive Firestore Rules: per-collection constraints, write validators, role checks; unit tests for rules.
-Server-signed barcode checksum (HMAC) if tamper resistance matters later.
-Returns/voids/exchanges flow that reverses stock and annotates invoices.
-Inventory operations
-Purchase Orders and Goods Receipt to increase stock with cost tracking.
-Stocktake (cycle counts) with variance reconciliation.
-POS quality of life
-Offline queue for scans and deferred checkout when network blips.
-Shift/session tracking: opening float, cash drawer totals, Z reports.
-Price overrides with reason and admin PIN.
-Performance/UX
-Lazy-load heavy libs (jsPDF) and defer until used.
-Skeleton loaders for live sections.
-Global toasts/announcements channel and rate-limited log capture.
-Ops/DevEx
-E2E tests with Playwright for core flows.
-CI build/typecheck/lint gates and environment checks.
+Customers
+- Enter phone: existing customer auto-fills name/email/DOB; new phone requires name; created on checkout.
+- Customer detail: purchase history real-time; metrics (total spend, visits, last purchase, top items) accurate.
 
-## New testing brief (sprint checklist)
+Offers
+- Create offers: flat/%, BOGO(same), product/category/bill targeting, dates active, DOB-month-only.
+- POS shows active offers; suggested offer appears when eligible; apply affects line or bill as configured; clear resets discounts.
 
-Setup and roles
-Verify env vars load, app boots without “Internal Server Error”.
-Login as Admin and as Cashier; role gating works; sidebar routes correct.
-Products & inventory
-Create/edit/delete product; SKU uniqueness enforced in practice.
-Update stock/reorder level; low-stock panel and bell dropdown react in real-time.
-Barcode generator
-Export A4 3×10 PDF; scan a label in POS; title/code/MRP alignment consistent across columns.
-Printed count increments for admin view only.
-POS (cashier)
-Scan PB|CAT|SKU and plain SKU; adds/merges line; success toast.
-Error scans show bottom-right toasts (invalid/NOREAD/SKU not found); focus returns to scan.
-Manual search (name/SKU) via opaque dropdown; add merges correctly.
-Item discount: select ₹/% and apply; math correct.
-Bill discount: select ₹/% and apply; math correct.
-Qty edit inline; remove line; keyboard: Arrow Up/Down selects row; +/- changes qty; Delete removes selected.
-Draft persistence: add lines, set discounts, payment method; refresh; draft restores; Clear Draft resets.
-Customer capture at checkout
-Enter phone → existing customer auto-detected (no extra fields).
-New phone → name required; email/kid’s DOB optional; customer created and linked on checkout.
-Checkout and stock
-Confirm payment & checkout writes invoice, decrements stock transactionally.
-No undefined writes; success toast; draft cleared.
-Invoices (real-time)
-Cashier: /invoices shows only own invoices; live update on new checkout; details page visible; no print button.
-Admin: /invoices shows all; filters
-Date range (from/to), status, cashier; results real-time.
-Click row → details page; Print button visible and works.
-If index warning appears, UI still functions (fallback); consider adding suggested indexes.
-Dashboard (admin)
-From/To date filter (default today) affects only stat cards.
-Revenue and Expenses (COGS) and New Customers reflect chosen range.
-Below stats: 2-column layout—Recent Invoices (real-time) and Low Stock items.
-Notifications and menus
-Bell dropdown opaque; shows “Low Stock” with item names only (no counts); badge for admin only.
-Profile menu opaque; sign-out works; authenticated routes protected.
-Error and resilience
-Refresh after edits/HMR: no generic “Internal Server Error”; global error boundary shows friendly UI if anything unexpected happens.
+Invoices
+- Cashier sees own invoices; Admin sees all; filters (date/status/cashier) work; index prompts handled.
+- Details page displays lines, discounts, totals; Admin Print works (browser print); URL back to list works.
+
+Reports
+- Sales report: choose range and group; table shows periods, invoice counts, totals.
+- Payment mode report: range filter; totals per method correct.
+- Accounting export: range/category/payment filters; CSV builds; Preview and Download work; discounts and tax columns populated.
+
+Resilience & permissions
+- Refresh during POS use doesn’t crash; draft cart persists and can be cleared.
+- Auth-protected routes redirect when unauthenticated; admin-only pages hidden for cashiers.
+
+## Next implementations (success-critical roadmap)
+
+1) Invoices & receipts
+- Dedicated printable invoice (branded) and PDF generation; email option.
+- 80mm thermal receipt template with concise layout (store/txn summary, QR optional).
+- Sequential invoice numbering using a server-side counter doc (transactionally increment).
+
+2) Stock reports
+- Reports → Stock: Current Stock CSV and Low-Stock CSV (filters by category, reorder only).
+- Optional: Inventory movement summary for a date range using logs (qty in/out, net).
+
+3) Data integrity & security
+- Firestore Security Rules v1: role-based read/write per collection; validators (e.g., non-negative stock, price limits); deny role escalation.
+- Composite indexes for common queries (customerId+issuedAt desc, issuedAt+status, issuedAt+cashierUserId).
+
+4) UX polish (Phase 6 alignment)
+- Mobile-first POS and dashboard layout tweaks; sticky totals panel; larger touch targets.
+- Settings: invoice template customization (logo, address, tax IDs, footer notes).
+
+5) Ops & quality
+- Seed demo data script for products/customers/offers.
+- Optional: E2E tests (Playwright) for core flows; add CI gates for build/typecheck/lint.
+- Optional: Error monitoring (Sentry) and lightweight analytics.
+
+Acceptance criteria for the above
+- PDFs and thermal receipts render correctly and download/print reliably; email sends a valid attachment.
+- Stock reports export correct, filtered datasets; low-stock export reflects thresholds.
+- Rules block unauthorized writes and invalid data; required indexes exist (no runtime prompts).
+- POS remains fast and usable on mobile; invoices show branding.
