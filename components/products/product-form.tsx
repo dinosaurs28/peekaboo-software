@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { CATEGORY_OPTIONS } from "@/lib/models";
 import { createProduct, updateProduct, UpsertProductInput } from "@/lib/products";
+import { listCategories } from "@/lib/categories";
+import type { CategoryDoc } from "@/lib/models";
 
 export interface ProductFormProps {
   mode: "create" | "edit";
@@ -26,6 +27,13 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<CategoryDoc[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    listCategories().then((cs) => { if (mounted) setCategories(cs.filter(c => c.active)); }).catch(() => undefined);
+    return () => { mounted = false; };
+  }, []);
 
   function update<K extends keyof UpsertProductInput>(key: K, val: UpsertProductInput[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -74,8 +82,8 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
             onChange={(e) => update("category", e.target.value || undefined)}
           >
             <option value="">Select category</option>
-            {CATEGORY_OPTIONS.map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.name}>{c.name} ({c.code})</option>
             ))}
           </select>
         </div>

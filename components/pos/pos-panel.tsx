@@ -6,6 +6,8 @@ import type { ProductDoc } from "@/lib/models";
 import { decodeBarcode } from "@/lib/barcodes";
 import { findProductBySKU, listProducts } from "@/lib/products";
 import { checkoutCart } from "@/lib/pos";
+import { listActiveOffers } from "@/lib/offers";
+import type { OfferDoc, ProductDoc as P } from "@/lib/models";
 import { findCustomerByPhone, createCustomer } from "@/lib/customers";
 import { DropdownPanel } from "@/components/ui/dropdown-panel";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -26,7 +28,12 @@ export function PosPanel() {
   const [toast, setToast] = useState<{ id: number; type: 'error' | 'success'; message: string } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'upi' | 'wallet'>('cash');
   const [paymentRef, setPaymentRef] = useState("");
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [splitPayments, setSplitPayments] = useState<Array<{ method: 'cash' | 'card' | 'upi' | 'wallet'; amount: number; referenceId?: string }>>([]);
   const { user } = useAuth();
+  // Offers
+  const [offers, setOffers] = useState<OfferDoc[]>([]);
+  const [offerAppliedId, setOfferAppliedId] = useState<string | null>(null);
   // Customer capture state
   const [custPhone, setCustPhone] = useState("");
   const [custName, setCustName] = useState("");
@@ -43,6 +50,11 @@ export function PosPanel() {
   useEffect(() => {
     // Load catalog for name search/manual add fallback
     listProducts().then(setAllProducts).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    // Load active offers for cashier visibility
+    listActiveOffers().then(setOffers).catch(() => undefined);
   }, []);
 
   // Draft persistence (v2) — save minimal productId-based lines and rehydrate from catalog
@@ -176,6 +188,121 @@ export function PosPanel() {
   const subTotal = useMemo(() => cart.reduce((sum, l) => sum + l.product.unitPrice * l.qty - lineDiscount(l), 0), [cart, lineDiscount]);
   const billDiscComputed = useMemo(() => (billDiscountMode === 'amount' ? billDiscount : (subTotal * billDiscount) / 100), [billDiscountMode, billDiscount, subTotal]);
   const total = useMemo(() => Math.max(0, subTotal - billDiscComputed), [subTotal, billDiscComputed]);
+
+  function isDobMonthMatch(): boolean {
+    if (!custKidsDob) return false;
+    try {
+      const month = new Date(custKidsDob).getMonth();
+      const nowM = new Date().getMonth();
+      return month === nowM;
+    } catch { return false; }
+  }
+
+  function offerMatchesCart(o: OfferDoc): boolean {
+    // DOB-only gate
+    if (o.dobMonthOnly && !isDobMonthMatch()) return false;
+    // Product/category targeting gate
+    const ids = new Set(o.productIds || []);
+    const cats = new Set((o.categoryNames || []).map(s => s.toLowerCase()));
+    const anyMatch = cart.some(l => ids.has(l.product.id!) || (l.product.category && cats.has(l.product.category.toLowerCase())));
+    // If neither productIds nor categories specified, consider bill-level true
+    return ids.size === 0 && cats.size === 0 ? true : anyMatch;
+  }
+
+  function computeOfferSavings(o: OfferDoc): number {
+    // Estimate savings for ranking suggestions
+    if (!offerMatchesCart(o)) return 0;
+    // BOGO same item: free getQty for every buyQty in matching lines
+    if (o.ruleType === 'bogoSameItem' && (o.buyQty || 0) > 0 && (o.getQty || 0) > 0) {
+      const buy = o.buyQty!; const get = o.getQty!;
+      let saved = 0;
+      const ids = new Set(o.productIds || []);
+      const cats = new Set((o.categoryNames || []).map(s => s.toLowerCase()));
+      for (const l of cart) {
+        const targeted = ids.has(l.product.id!) || (l.product.category && cats.has(l.product.category.toLowerCase()));
+        if (!targeted) continue;
+        const groups = Math.floor(l.qty / (buy + get));
+        const freeQty = groups * get;
+        saved += freeQty * l.product.unitPrice;
+      }
+      return saved;
+    }
+    // Flat/percentage: apply to matching lines or entire bill if untargeted
+    if ((o.ruleType || (o.discountType === 'amount' ? 'flat' : o.discountType === 'percentage' ? 'percentage' : undefined)) === 'flat') {
+      if ((o.productIds?.length || 0) + (o.categoryNames?.length || 0) === 0) {
+        return Number(o.discountValue || 0);
+      }
+      const ids = new Set(o.productIds || []);
+      const cats = new Set((o.categoryNames || []).map(s => s.toLowerCase()));
+      const matchedLines = cart.filter(l => ids.has(l.product.id!) || (l.product.category && cats.has(l.product.category.toLowerCase())));
+      return matchedLines.reduce((s, l) => s + Number(o.discountValue || 0), 0);
+    }
+    if ((o.ruleType || (o.discountType === 'amount' ? 'flat' : o.discountType === 'percentage' ? 'percentage' : undefined)) === 'percentage') {
+      const pct = Number(o.discountValue || 0) / 100;
+      if ((o.productIds?.length || 0) + (o.categoryNames?.length || 0) === 0) {
+        return subTotal * pct;
+      }
+      const ids = new Set(o.productIds || []);
+      const cats = new Set((o.categoryNames || []).map(s => s.toLowerCase()));
+      const matchedLines = cart.filter(l => ids.has(l.product.id!) || (l.product.category && cats.has(l.product.category.toLowerCase())));
+      const sum = matchedLines.reduce((s, l) => s + l.product.unitPrice * l.qty, 0);
+      return sum * pct;
+    }
+    return 0;
+  }
+
+  function applyOffer(id: string) {
+    const offer = offers.find(o => o.id === id);
+    if (!offer) return;
+    // Reset any previously applied selection marker
+    setOfferAppliedId(offer.id!);
+    // If offer targets specific products, apply item-level discounts; else apply bill-level discount
+    const ids = new Set(offer.productIds || []);
+    const cats = new Set((offer.categoryNames || []).map(s => s.toLowerCase()));
+    const targeted = (ids.size + cats.size) > 0;
+    if (offer.ruleType === 'bogoSameItem' && targeted && (offer.buyQty || 0) > 0 && (offer.getQty || 0) > 0) {
+      const buy = offer.buyQty!; const get = offer.getQty!;
+      setCart(prev => prev.map(l => {
+        const match = ids.has(l.product.id!) || (l.product.category && cats.has(l.product.category.toLowerCase()));
+        if (!match) return l;
+        // BOGO: convert to an equivalent per-line discount based on free units
+        const groups = Math.floor(l.qty / (buy + get));
+        const freeQty = groups * get;
+        const freeValue = freeQty * l.product.unitPrice;
+        // Apply as amount discount
+        return { ...l, itemDiscountMode: 'amount', itemDiscount: (freeValue / Math.max(1, l.qty)) };
+      }));
+    } else if (targeted) {
+      setCart((prev) => prev.map((l) => {
+        const match = ids.has(l.product.id!) || (l.product.category && cats.has(l.product.category.toLowerCase()));
+        if (!match) return l;
+        if (offer.discountType === 'amount') {
+          return { ...l, itemDiscountMode: 'amount', itemDiscount: Number(offer.discountValue || 0) };
+        } else if (offer.discountType === 'percentage') {
+          return { ...l, itemDiscountMode: 'percent', itemDiscount: Number(offer.discountValue || 0) };
+        }
+        return l;
+      }));
+    } else {
+      // Bill level
+      if (offer.discountType === 'amount') {
+        setBillDiscountMode('amount');
+        setBillDiscount(Number(offer.discountValue || 0));
+      } else if (offer.discountType === 'percentage') {
+        setBillDiscountMode('percent');
+        setBillDiscount(Number(offer.discountValue || 0));
+      }
+    }
+    showToast('success', `Offer applied: ${offer.name}`);
+  }
+
+  function clearOfferAdjustments() {
+    setOfferAppliedId(null);
+    // Reset discounts
+    setBillDiscount(0);
+    setBillDiscountMode('amount');
+    setCart((prev) => prev.map((l) => ({ ...l, itemDiscount: undefined, itemDiscountMode: undefined })));
+  }
 
   function parseScanError(raw: string): string | null {
     if (!raw) return "Empty scan. Please try again.";
@@ -369,6 +496,9 @@ export function PosPanel() {
           customerId = newId;
         }
       }
+      const payments = splitEnabled && splitPayments.length > 0
+        ? splitPayments.map(p => ({ method: p.method, amount: Number(p.amount || 0), referenceId: p.referenceId }))
+        : undefined;
       await checkoutCart({
         lines: cart.map((l) => ({
           productId: l.product.id!,
@@ -376,8 +506,11 @@ export function PosPanel() {
           qty: l.qty,
           unitPrice: l.product.unitPrice,
           lineDiscount: lineDiscount(l),
-        })),
+          // pass tax rate if present for GST calc
+          taxRatePct: l.product.taxRatePct,
+        }) as any),
         billDiscount: billDiscComputed,
+        payments,
         paymentMethod,
         paymentReferenceId: paymentRef || undefined,
         cashierUserId: user?.uid,
@@ -389,6 +522,8 @@ export function PosPanel() {
       setSelectedIndex(-1);
       setBillDiscount(0);
       setPaymentRef("");
+      setSplitEnabled(false);
+      setSplitPayments([]);
       setCustPhone("");
       setCustName("");
       setCustEmail("");
@@ -449,6 +584,24 @@ export function PosPanel() {
       row?.scrollIntoView({ block: 'nearest' });
     }
   }, [selectedIndex, cart.length]);
+
+  // Auto-alert best applicable offer when cart or customer DOB changes
+  const bestOffer = useMemo(() => {
+    if (!offers.length || cart.length === 0) return null as OfferDoc | null;
+    const candidates = offers.filter(offerMatchesCart);
+    if (!candidates.length) return null;
+    // Sort by priority then savings desc
+    const scored = candidates.map(o => ({ o, saved: computeOfferSavings(o), prio: o.priority ?? 100 }));
+    scored.sort((a, b) => (a.prio - b.prio) || (b.saved - a.saved));
+    return scored[0].o;
+  }, [offers, cart, custKidsDob, subTotal]);
+
+  useEffect(() => {
+    if (bestOffer) {
+      showToast('success', `Offer available: ${bestOffer.name}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bestOffer?.id]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -571,6 +724,18 @@ export function PosPanel() {
           <div className="text-sm text-muted-foreground">Subtotal</div>
           <div className="text-xl font-semibold">₹{subTotal.toFixed(2)}</div>
         </div>
+        {offers.length > 0 && (
+          <div className="border rounded-md p-4 space-y-2">
+            <div className="text-sm font-medium">Active Offers</div>
+            <div className="flex flex-wrap gap-2">
+              {offers.map(o => (
+                <button key={o.id} type="button" onClick={() => applyOffer(o.id!)} className={`px-2 py-1 rounded-md border text-sm ${offerAppliedId === o.id ? 'bg-emerald-600 text-white' : 'bg-background'}`}>{o.name}</button>
+              ))}
+            </div>
+            {bestOffer && <div className="text-xs text-muted-foreground">Suggested: <button className="underline" onClick={() => applyOffer(bestOffer.id!)}>{bestOffer.name}</button></div>}
+            <button type="button" className="text-xs underline text-muted-foreground" onClick={clearOfferAdjustments}>Clear offer adjustments</button>
+          </div>
+        )}
         <div className="border rounded-md p-4">
           <div className="text-sm text-muted-foreground">Bill discount</div>
           <div className="flex items-center gap-2">
@@ -597,6 +762,31 @@ export function PosPanel() {
             </select>
           </div>
           <Input placeholder="Reference / Txn ID (optional)" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} />
+          <div className="flex items-center gap-2">
+            <input id="split" type="checkbox" checked={splitEnabled} onChange={(e) => setSplitEnabled(e.target.checked)} />
+            <label htmlFor="split" className="text-sm">Split payments</label>
+          </div>
+          {splitEnabled && (
+            <div className="space-y-2">
+              {splitPayments.map((p, idx) => (
+                <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
+                  <select className="h-9 rounded-md border bg-background px-2 text-sm" value={p.method} onChange={(e) => setSplitPayments(prev => prev.map((x, i) => i === idx ? { ...x, method: e.target.value as any } : x))}>
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="upi">UPI</option>
+                    <option value="wallet">Wallet</option>
+                  </select>
+                  <Input type="number" placeholder="Amount" value={p.amount === 0 ? "" : p.amount} onChange={(e) => setSplitPayments(prev => prev.map((x, i) => i === idx ? { ...x, amount: Number(e.target.value || 0) } : x))} />
+                  <Input placeholder="Reference (optional)" value={p.referenceId || ""} onChange={(e) => setSplitPayments(prev => prev.map((x, i) => i === idx ? { ...x, referenceId: e.target.value } : x))} />
+                  <Button variant="destructive" onClick={() => setSplitPayments(prev => prev.filter((_, i) => i !== idx))}>Remove</Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setSplitPayments(prev => [...prev, { method: 'cash', amount: 0 }])}>Add Payment</Button>
+                <div className="text-xs text-muted-foreground">Total entered: ₹{splitPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0).toFixed(2)} / ₹{total.toFixed(2)}</div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <Button className="flex-1" variant="outline" disabled={cart.length === 0} onClick={() => { setCart([]); setBillDiscount(0); setPaymentRef(""); setCustPhone(""); setCustName(""); setCustEmail(""); setCustKidsDob(""); try { localStorage.removeItem(DRAFT_KEY_V2); localStorage.removeItem(DRAFT_KEY_V1); } catch { }; showToast('success', 'Draft cleared'); }}>Clear Draft</Button>
