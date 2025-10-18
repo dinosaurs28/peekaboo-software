@@ -58,7 +58,10 @@ export default function InvoiceDetailsPage() {
             <Button variant="outline" onClick={() => { window.location.href = "/invoices"; }}>← Back</Button>
             <h1 className="text-xl font-semibold">Invoice {invoice?.invoiceNumber || id}</h1>
             {canPrint && (
-              <Button onClick={() => window.print()}>Print</Button>
+              <div className="flex gap-2">
+                <Button onClick={() => window.open(window.location.pathname + "/print-a4", "_blank")}>Print A4</Button>
+                <Button variant="outline" onClick={() => window.open(window.location.pathname + "/print-80mm", "_blank")}>Print 80mm</Button>
+              </div>
             )}
           </div>
           <Card className="p-4 space-y-2">
