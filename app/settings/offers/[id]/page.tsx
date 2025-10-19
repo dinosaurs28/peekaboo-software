@@ -31,8 +31,8 @@ export default function EditOfferPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([listProducts(), listCategories(true)])
-      .then(([prods, cats]) => { setCatalog(prods); setCategories(cats); })
+    Promise.all([listProducts(), listCategories()])
+      .then(([prods, cats]) => { setCatalog(prods); setCategories(cats.filter(c => c.active)); })
       .catch(() => undefined);
   }, []);
   const [ruleType, setRuleType] = useState<'flat' | 'percentage' | 'bogoSameItem'>('flat');
