@@ -182,11 +182,11 @@ Resilience & permissions
  - XLSX export for Stock and Accounting. [Done]
  - Optional: Inventory movement summary for a date range using logs (qty in/out, net).
 
-3) Data integrity & security
+3) Data integrity & security [Done]
 - Firestore Security Rules v1: role-based read/write per collection; validators (e.g., non-negative stock, price limits); deny role escalation.
 - Composite indexes for common queries (customerId+issuedAt desc, issuedAt+status, issuedAt+cashierUserId).
 
-6) Returns/voids & after-sales
+6) Returns/voids & after-sales [Discuss with Client]
 - Add returns/void/exchange flow that reverses stock and annotates invoices; write inventory logs accordingly.
 
 7) Loyalty and engagement (optional)
