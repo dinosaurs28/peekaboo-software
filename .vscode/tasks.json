@@ -10,6 +10,18 @@
 				"$tsc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Install dependencies",
+			"type": "shell",
+			"command": "npm install",
+			"group": "build"
+		},
+		{
+			"label": "Build Next.js app",
+			"type": "shell",
+			"command": "npm run build",
+			"group": "build"
 		}
 	]
 }
