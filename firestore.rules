@@ -1,9 +1,198 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Placeholder: tighten later. See README for planned role-based rules.
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/Users/$(request.auth.uid));
+    }
+
+    function userExists() {
+      return isSignedIn() && userDoc().exists();
+    }
+
+    function isActive() {
+      return userExists() && (userDoc().data.active == true);
+    }
+
+    function userRole() {
+      // default to 'cashier' if missing
+      return userExists() ? (userDoc().data.role != null ? userDoc().data.role : 'cashier') : 'guest';
+    }
+
+    function isAdmin() {
+      return isActive() && userRole() == 'admin';
+    }
+
+    function isStaff() {
+      return isActive() && (userRole() == 'admin' || userRole() == 'cashier');
+    }
+
+    // Validators
+    function isNonNegNumber(n) {
+      return n is number && n >= 0;
+    }
+
+    function isPct(n) {
+      return n is number && n >= 0 && n <= 28; // GST typical upper bound
+    }
+
+    function hasOnlyAllowedChanges(allowed) {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly(allowed);
+    }
+
+    // Users
+    match /Users/{uid} {
+      allow read: if isAdmin() || (isSignedIn() && uid == request.auth.uid);
+      // Bootstrap: allow a signed-in user to create their own user doc with restricted fields
+      allow create: if isSignedIn() && uid == request.auth.uid &&
+        request.resource.data.authUid == request.auth.uid &&
+        request.resource.data.email is string &&
+        (request.resource.data.role == null || request.resource.data.role == 'cashier') &&
+        (request.resource.data.active == null || request.resource.data.active == true);
+
+      // User can update their own non-privileged fields
+      allow update: if (
+        isAdmin() || (
+          isSignedIn() && uid == request.auth.uid &&
+          hasOnlyAllowedChanges(['displayName','lastLoginAt','updatedAt','email'])
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // Settings (invoice counters, business profile)
+    match /Settings/{id} {
+      allow read: if isStaff();
+      // Admin can change any setting
+      allow update, create, delete: if isAdmin();
+      // Cashier can only bump invoice counter fields safely
+      allow update: if isStaff() && !isAdmin() &&
+        hasOnlyAllowedChanges(['nextInvoiceSequence', 'updatedAt']) &&
+        request.resource.data.nextInvoiceSequence is number &&
+        request.resource.data.nextInvoiceSequence >= resource.data.nextInvoiceSequence;
+    }
+
+    // Products
+    match /Products/{id} {
+      allow read: if isStaff();
+      // Admin full control with validations
+      allow create: if isAdmin() &&
+        request.resource.data.name is string &&
+        request.resource.data.sku is string &&
+        isNonNegNumber(request.resource.data.unitPrice) &&
+        isNonNegNumber(request.resource.data.stock) &&
+        (request.resource.data.reorderLevel == null || isNonNegNumber(request.resource.data.reorderLevel)) &&
+        (request.resource.data.taxRatePct == null || isPct(request.resource.data.taxRatePct));
+
+      allow update: if (
+        // Admin can update any product with same validations
+        (isAdmin() &&
+          (request.resource.data.taxRatePct == null || isPct(request.resource.data.taxRatePct)) &&
+          isNonNegNumber(request.resource.data.unitPrice) &&
+          isNonNegNumber(request.resource.data.stock) &&
+          (request.resource.data.reorderLevel == null || isNonNegNumber(request.resource.data.reorderLevel))
+        )
+        ||
+        // Cashier can only adjust stock/printedCount and updatedAt (e.g., checkout, receiving, printing labels)
+        (isStaff() && !isAdmin() && hasOnlyAllowedChanges(['stock','printedCount','updatedAt']) &&
+          isNonNegNumber(request.resource.data.stock) &&
+          (request.resource.data.printedCount == null || isNonNegNumber(request.resource.data.printedCount))
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // Categories
+    match /Categories/{id} {
+      allow read: if isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Customers
+    match /Customers/{id} {
+      allow read: if isStaff();
+      // Staff can create/update customer basic fields
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // Invoices
+    match /Invoices/{id} {
+      allow read: if isStaff();
+
+      // Create by staff (cashier/admin). Basic validations on totals
+      allow create: if isStaff() &&
+        isNonNegNumber(request.resource.data.subtotal) &&
+        isNonNegNumber(request.resource.data.taxTotal) &&
+        isNonNegNumber(request.resource.data.grandTotal) &&
+        request.resource.data.items is list &&
+        request.resource.data.invoiceNumber is string &&
+        request.resource.data.status in ['paid','partial','unpaid','void'];
+
+      // Update: by admin, or limited updates by original cashier for payment/status fields
+      allow update: if (
+        isAdmin()
+        || (
+          isStaff() && !isAdmin() &&
+          // limit cashier updates to payments/balance/status/updatedAt only
+          hasOnlyAllowedChanges(['payments','balanceDue','status','updatedAt']) &&
+          request.resource.data.status in ['paid','partial','unpaid','void']
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // Inventory logs
+    match /InventoryLogs/{id} {
+      allow read: if isStaff();
+      // Staff can create logs; validate numeric
+      allow create: if isStaff() &&
+        request.resource.data.productId is string &&
+        request.resource.data.type in ['adjustment','sale','purchase','return','damage'] &&
+        request.resource.data.quantityChange is number &&
+        (request.resource.data.previousStock == null || request.resource.data.previousStock is number) &&
+        (request.resource.data.newStock == null || request.resource.data.newStock is number);
+      allow update, delete: if isAdmin();
+    }
+
+    // Goods Receipts
+    match /GoodsReceipts/{id} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Offers
+    match /Offers/{id} {
+      allow read: if isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Barcodes
+    match /Barcodes/{id} {
+      allow read: if isStaff();
+      // Only admin manages barcode docs (UI currently admin-only)
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Reports (snapshots extracted for accounting, etc.)
+    match /Reports/{id} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Default deny
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }
