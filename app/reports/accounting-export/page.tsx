@@ -19,7 +19,7 @@ export default function AccountingExportPage() {
   const [csv, setCsv] = useState<string>("");
   const [loadingData, setLoadingData] = useState(false);
 
-  useEffect(() => { listCategories(true).then(setCategories).catch(() => undefined); }, []);
+  useEffect(() => { listCategories().then((c) => setCategories(c.filter(x => x.active))).catch(() => undefined); }, []);
 
   async function run() {
     setLoadingData(true);
@@ -37,6 +37,13 @@ export default function AccountingExportPage() {
     a.download = `accounting_${from.slice(0, 10)}_${to.slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function downloadXlsx() {
+    if (!csv) return;
+    const XLSX = await import('xlsx');
+    const wb = XLSX.read(csv, { type: 'string' });
+    XLSX.writeFile(wb, `accounting_${from.slice(0, 10)}_${to.slice(0, 10)}.xlsx`);
   }
 
   if (loading) return <div className="p-6">Loading…</div>;
@@ -83,7 +90,10 @@ export default function AccountingExportPage() {
             <div className="space-y-2">
               <div className="text-sm text-muted-foreground">Preview (first 20 rows)</div>
               <pre className="border rounded-md p-2 max-h-64 overflow-auto text-xs whitespace-pre-wrap">{csv.split('\n').slice(0, 21).join('\n')}</pre>
-              <button className="px-3 py-2 rounded-md border bg-emerald-600 text-white" onClick={download}>Download CSV</button>
+              <div className="flex gap-2">
+                <button className="px-3 py-2 rounded-md border bg-emerald-600 text-white" onClick={download}>Download CSV</button>
+                <button className="px-3 py-2 rounded-md border bg-background" onClick={downloadXlsx}>Download XLSX</button>
+              </div>
             </div>
           )}
         </main>
