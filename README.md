@@ -120,10 +120,10 @@ Known gaps (outside Phase 6)
 - Phase 3
 	- PDF generation and email-send are optional and not implemented by design (browser print used).
 - Phase 5
-	- Stock report page/export (current stock and low-stock CSV) not yet implemented.
-	- XLSX export option (optional) not implemented; CSV provided.
+	- [Done] Stock report page/export (current stock and low-stock CSV + XLSX).
+	- [Done] XLSX export option alongside CSV.
 - Cross-cutting
-	- Composite Firestore indexes (create when prompted by console for customerId+issuedAt, etc.).
+	- [Done] Composite Firestore indexes configured (Invoices and InventoryLogs); deploy via CLI when project is connected to Firebase.
 
 ## Testing brief (End-to-end checklist)
 
@@ -178,8 +178,9 @@ Resilience & permissions
 - Optional: PDF generation and email option (if needed later).
 
 2) Stock reports
-- Reports → Stock: Current Stock CSV and Low-Stock CSV (filters by category, reorder only).
-- Optional: Inventory movement summary for a date range using logs (qty in/out, net).
+ - Reports → Stock: Current Stock CSV and Low-Stock CSV (filters by category, reorder only). [Done]
+ - XLSX export for Stock and Accounting. [Done]
+ - Optional: Inventory movement summary for a date range using logs (qty in/out, net).
 
 3) Data integrity & security
 - Firestore Security Rules v1: role-based read/write per collection; validators (e.g., non-negative stock, price limits); deny role escalation.
@@ -199,6 +200,32 @@ Resilience & permissions
 - Seed demo data script for products/customers/offers.
 - Optional: E2E tests (Playwright) for core flows; add CI gates for build/typecheck/lint.
 - Optional: Error monitoring (Sentry) and lightweight analytics.
+
+## Firestore composite indexes
+
+Why needed:
+- Firestore auto-creates single-field indexes, but multi-field (composite) queries need explicit composite indexes. Phase 5 screens (Invoices & Reports) commonly run queries like:
+  - where(customerId == X) orderBy(issuedAt desc)
+  - where(cashierUserId == X) orderBy(issuedAt desc)
+  - where(status == 'paid') orderBy(issuedAt desc)
+  - where(cashierUserId == X, status == 'paid') orderBy(issuedAt desc)
+  - Inventory Logs: where(productId == X) orderBy(createdAt desc), where(type == 'sale') orderBy(createdAt desc)
+
+What’s included:
+- `firestore.indexes.json` defines composite indexes for the above patterns (Invoices and InventoryLogs).
+- `firebase.json` is configured to deploy these indexes and associates `firestore.rules`.
+
+How to deploy (CLI):
+1) Install tools and login (Windows PowerShell):
+	- npm install -g firebase-tools
+	- firebase login
+2) Initialize project if needed: firebase init (select Firestore; choose existing project).
+3) Deploy indexes and rules:
+	- firebase deploy --only firestore:indexes,firestore:rules
+
+Notes:
+- If you hit a Firestore error with a link to create an index, you can click it in the console, or add the equivalent entry to `firestore.indexes.json` and redeploy.
+- Index creation can take a few minutes. Queries begin working once the specific index is ready.
 
 Acceptance criteria for the above
 - PDFs and thermal receipts render correctly and download/print reliably; email sends a valid attachment.
