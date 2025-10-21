@@ -28,8 +28,6 @@ export function PosPanel() {
   const [toast, setToast] = useState<{ id: number; type: 'error' | 'success'; message: string } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'upi' | 'wallet'>('cash');
   const [paymentRef, setPaymentRef] = useState("");
-  const [splitEnabled, setSplitEnabled] = useState(false);
-  const [splitPayments, setSplitPayments] = useState<Array<{ method: 'cash' | 'card' | 'upi' | 'wallet'; amount: number; referenceId?: string }>>([]);
   const { user } = useAuth();
   // Offers
   const [offers, setOffers] = useState<OfferDoc[]>([]);
@@ -496,9 +494,6 @@ export function PosPanel() {
           customerId = newId;
         }
       }
-      const payments = splitEnabled && splitPayments.length > 0
-        ? splitPayments.map(p => ({ method: p.method, amount: Number(p.amount || 0), referenceId: p.referenceId }))
-        : undefined;
       await checkoutCart({
         lines: cart.map((l) => ({
           productId: l.product.id!,
@@ -510,7 +505,6 @@ export function PosPanel() {
           taxRatePct: l.product.taxRatePct,
         }) as any),
         billDiscount: billDiscComputed,
-        payments,
         paymentMethod,
         paymentReferenceId: paymentRef || undefined,
         cashierUserId: user?.uid,
@@ -522,8 +516,7 @@ export function PosPanel() {
       setSelectedIndex(-1);
       setBillDiscount(0);
       setPaymentRef("");
-      setSplitEnabled(false);
-      setSplitPayments([]);
+      // split payments removed
       setCustPhone("");
       setCustName("");
       setCustEmail("");
@@ -762,31 +755,7 @@ export function PosPanel() {
             </select>
           </div>
           <Input placeholder="Reference / Txn ID (optional)" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} />
-          <div className="flex items-center gap-2">
-            <input id="split" type="checkbox" checked={splitEnabled} onChange={(e) => setSplitEnabled(e.target.checked)} />
-            <label htmlFor="split" className="text-sm">Split payments</label>
-          </div>
-          {splitEnabled && (
-            <div className="space-y-2">
-              {splitPayments.map((p, idx) => (
-                <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
-                  <select className="h-9 rounded-md border bg-background px-2 text-sm" value={p.method} onChange={(e) => setSplitPayments(prev => prev.map((x, i) => i === idx ? { ...x, method: e.target.value as any } : x))}>
-                    <option value="cash">Cash</option>
-                    <option value="card">Card</option>
-                    <option value="upi">UPI</option>
-                    <option value="wallet">Wallet</option>
-                  </select>
-                  <Input type="number" placeholder="Amount" value={p.amount === 0 ? "" : p.amount} onChange={(e) => setSplitPayments(prev => prev.map((x, i) => i === idx ? { ...x, amount: Number(e.target.value || 0) } : x))} />
-                  <Input placeholder="Reference (optional)" value={p.referenceId || ""} onChange={(e) => setSplitPayments(prev => prev.map((x, i) => i === idx ? { ...x, referenceId: e.target.value } : x))} />
-                  <Button variant="destructive" onClick={() => setSplitPayments(prev => prev.filter((_, i) => i !== idx))}>Remove</Button>
-                </div>
-              ))}
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setSplitPayments(prev => [...prev, { method: 'cash', amount: 0 }])}>Add Payment</Button>
-                <div className="text-xs text-muted-foreground">Total entered: ₹{splitPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0).toFixed(2)} / ₹{total.toFixed(2)}</div>
-              </div>
-            </div>
-          )}
+          {/* Split payments removed */}
         </div>
         <div className="flex gap-2">
           <Button className="flex-1" variant="outline" disabled={cart.length === 0} onClick={() => { setCart([]); setBillDiscount(0); setPaymentRef(""); setCustPhone(""); setCustName(""); setCustEmail(""); setCustKidsDob(""); try { localStorage.removeItem(DRAFT_KEY_V2); localStorage.removeItem(DRAFT_KEY_V1); } catch { }; showToast('success', 'Draft cleared'); }}>Clear Draft</Button>

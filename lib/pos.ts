@@ -1,14 +1,13 @@
 "use client";
 import { db } from "@/lib/firebase";
 import { collection, serverTimestamp, runTransaction, doc, increment } from "firebase/firestore";
-import type { InvoiceDoc, PaymentRecord } from "@/lib/models";
+import type { InvoiceDoc } from "@/lib/models";
 import { COLLECTIONS, GoodsReceiptDoc, GoodsReceiptLine } from "@/lib/models";
 
 export type CheckoutInput = {
   lines: Array<{ productId: string; name: string; qty: number; unitPrice: number; lineDiscount?: number }>;
   billDiscount?: number;
-  // Either provide payments[] for split, or paymentMethod for single
-  payments?: PaymentRecord[];
+  // Single payment only
   paymentMethod?: 'cash' | 'card' | 'upi' | 'wallet';
   paymentReferenceId?: string;
   cashierUserId?: string;
@@ -20,6 +19,25 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
   if (!db) throw new Error("Firestore not initialized");
   const dbx = db!;
   const nowIso = new Date().toISOString();
+  // Basic validations: forbid negative qty/price/discounts and ensure sensible totals
+  if (!Array.isArray(input.lines) || input.lines.length === 0) {
+    throw new Error("Cart is empty");
+  }
+  for (const l of input.lines) {
+    if (!l || typeof l.productId !== 'string' || !l.productId) throw new Error("Invalid line: product missing");
+    if (!(Number.isFinite(l.qty) && l.qty > 0)) throw new Error("Invalid line: qty must be > 0");
+    if (!(Number.isFinite(l.unitPrice) && l.unitPrice >= 0)) throw new Error("Invalid line: unit price must be >= 0");
+    if (l.lineDiscount != null) {
+      if (!(Number.isFinite(l.lineDiscount) && (l.lineDiscount as number) >= 0)) throw new Error("Invalid line: discount must be >= 0");
+      const lineTotal = l.unitPrice * l.qty;
+      if ((l.lineDiscount as number) > lineTotal) throw new Error("Invalid line: discount exceeds line total");
+    }
+  }
+  if (input.billDiscount != null) {
+    if (!(Number.isFinite(input.billDiscount) && (input.billDiscount as number) >= 0)) {
+      throw new Error("Invalid bill discount: must be >= 0");
+    }
+  }
   // Compute per-line net and proportional bill discount for tax base
   const lineNets = input.lines.map(l => ({
     ...l,
@@ -27,6 +45,9 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
   }));
   const subtotal = lineNets.reduce((s, l) => s + l.net, 0);
   const billDisc = input.billDiscount ?? 0;
+  if (billDisc > subtotal) {
+    throw new Error("Bill discount cannot exceed subtotal");
+  }
   // Distribute bill discount proportionally across lines for tax computation
   const totalBase = Math.max(1, subtotal);
   const linesWithBillShare = lineNets.map(l => ({
@@ -47,6 +68,8 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
   const refId = input.paymentReferenceId;
   const cashierUserId = input.cashierUserId ?? 'current-user';
   const cashierName = input.cashierName;
+
+  // Single payment path only; no split payments
 
   // Transaction: decrement stock for each product and then create invoice
   const invoiceId = await runTransaction(dbx, async (tx) => {
@@ -95,9 +118,8 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       taxTotal,
       discountTotal: billDisc,
       grandTotal,
-      payments: (Array.isArray(input.payments) && input.payments.length > 0)
-        ? input.payments
-        : [{ method, amount: grandTotal, ...(refId ? { referenceId: refId } : {}) }],
+  paymentMethod: method,
+  ...(refId ? { paymentReferenceId: refId } : {}),
       balanceDue: 0,
       cashierUserId,
       ...(cashierName ? { cashierName } : {}),
@@ -107,13 +129,7 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       updatedAt: nowIso,
     };
 
-    // Validate payments sum if provided
-    if (Array.isArray(input.payments) && input.payments.length > 0) {
-      const paid = input.payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
-      if (Math.abs(paid - grandTotal) > 0.01) {
-        throw new Error(`Split payments do not sum to total. Paid ${paid.toFixed(2)} vs ${grandTotal.toFixed(2)}`);
-      }
-    }
+    // No-op: payments already validated above
 
     // Create invoice inside the transaction using tx.set
     tx.set(invRef, {
@@ -183,6 +199,13 @@ export async function receiveStock(params: {
 }): Promise<string> {
   if (!db) throw new Error("Firestore not initialized");
   const dbx = db!;
+  if (!params || !Array.isArray(params.lines) || params.lines.length === 0) {
+    throw new Error("No lines to receive");
+  }
+  for (const line of params.lines) {
+    if (!(Number.isFinite(line.qty) && line.qty > 0)) throw new Error("Receive qty must be > 0");
+    if (line.unitCost != null && !(Number.isFinite(line.unitCost) && line.unitCost >= 0)) throw new Error("Unit cost must be >= 0");
+  }
   const now = new Date().toISOString();
   const receiptId = await runTransaction(dbx, async (tx) => {
     const recRef = doc(collection(dbx, COLLECTIONS.goodsReceipts));
