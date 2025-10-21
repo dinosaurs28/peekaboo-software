@@ -51,12 +51,6 @@ export interface InvoiceLineItem {
   discountAmount?: number; // absolute amount per line
 }
 
-export interface PaymentRecord {
-  method: 'cash' | 'card' | 'upi' | 'wallet';
-  amount: number;
-  referenceId?: string; // txn id, last4, etc.
-}
-
 export interface InvoiceDoc extends BaseDoc {
   invoiceNumber: string; // sequential human-readable
   customerId?: string;
@@ -65,7 +59,8 @@ export interface InvoiceDoc extends BaseDoc {
   taxTotal: number;
   discountTotal?: number;
   grandTotal: number;
-  payments: PaymentRecord[];
+  paymentMethod: 'cash' | 'card' | 'upi' | 'wallet';
+  paymentReferenceId?: string;
   balanceDue: number;
   cashierUserId: string;
   cashierName?: string;
