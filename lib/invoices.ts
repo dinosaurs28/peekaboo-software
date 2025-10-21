@@ -1,7 +1,7 @@
 "use client";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, orderBy, query, where, type DocumentData, type QuerySnapshot, type QueryConstraint, type FirestoreError } from "firebase/firestore";
-import type { InvoiceDoc, PaymentRecord } from "@/lib/models";
+import type { InvoiceDoc } from "@/lib/models";
 import { COLLECTIONS } from "@/lib/models";
 
 function asString(v: unknown, def = ""): string { return typeof v === "string" ? v : def; }
@@ -14,8 +14,8 @@ function asNumber(v: unknown, def = 0): number {
   return def;
 }
 function isRecord(v: unknown): v is Record<string, unknown> { return typeof v === "object" && v !== null; }
-function isArrayOfRecords(v: unknown): v is Array<Record<string, unknown>> { return Array.isArray(v) && v.every(isRecord); }
-function asPaymentMethod(v: unknown): PaymentRecord["method"] {
+function asArrayOfRecords(v: unknown): v is Array<Record<string, unknown>> { return Array.isArray(v) && v.every(isRecord); }
+function asPaymentMethod(v: unknown): InvoiceDoc["paymentMethod"] {
   return v === "card" || v === "upi" || v === "wallet" ? v : "cash";
 }
 function asInvoiceStatus(v: unknown): InvoiceDoc["status"] {
@@ -28,7 +28,7 @@ export function toInvoiceDoc(id: string, data: Record<string, unknown>): Invoice
     id,
     invoiceNumber: asString(data.invoiceNumber, id),
     customerId: typeof data.customerId === "string" ? data.customerId : undefined,
-    items: isArrayOfRecords(data.items) ? data.items.map((it) => ({
+  items: asArrayOfRecords(data.items) ? data.items.map((it) => ({
       productId: asString(it.productId),
       name: asString(it.name),
       quantity: asNumber(it.quantity, 0),
@@ -40,11 +40,8 @@ export function toInvoiceDoc(id: string, data: Record<string, unknown>): Invoice
     taxTotal: asNumber(data.taxTotal, 0),
     discountTotal: data.discountTotal != null ? asNumber(data.discountTotal) : undefined,
     grandTotal: asNumber(data.grandTotal, 0),
-    payments: isArrayOfRecords(data.payments) ? data.payments.map((p) => ({
-      method: asPaymentMethod(p.method),
-      amount: asNumber(p.amount, 0),
-      referenceId: typeof p.referenceId === "string" ? p.referenceId : undefined,
-    })) : [],
+    paymentMethod: asPaymentMethod(data.paymentMethod),
+    paymentReferenceId: typeof data.paymentReferenceId === "string" ? data.paymentReferenceId : undefined,
     balanceDue: asNumber(data.balanceDue, 0),
     cashierUserId: asString(data.cashierUserId, ""),
     cashierName: typeof data.cashierName === "string" ? data.cashierName : undefined,
