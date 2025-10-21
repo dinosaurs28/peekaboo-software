@@ -133,6 +133,13 @@ service cloud.firestore {
         isNonNegNumber(request.resource.data.taxTotal) &&
         isNonNegNumber(request.resource.data.grandTotal) &&
         request.resource.data.items is list &&
+        // Forbid negative qty/price/discount per line
+        request.resource.data.items.size() > 0 &&
+        request.resource.data.items.every(it => it.quantity is number && it.quantity > 0 && it.unitPrice is number && it.unitPrice >= 0 && (it.discountAmount == null || (it.discountAmount is number && it.discountAmount >= 0))) &&
+        // Bill discount must be non-negative and not exceed subtotal
+        (request.resource.data.discountTotal == null || (request.resource.data.discountTotal is number && request.resource.data.discountTotal >= 0 && request.resource.data.discountTotal <= request.resource.data.subtotal)) &&
+        // Payments non-negative when provided
+        (request.resource.data.payments is list ? request.resource.data.payments.every(p => p.amount is number && p.amount >= 0) : true) &&
         request.resource.data.invoiceNumber is string &&
         request.resource.data.status in ['paid','partial','unpaid','void'];
 
@@ -143,6 +150,8 @@ service cloud.firestore {
           isStaff() && !isAdmin() &&
           // limit cashier updates to payments/balance/status/updatedAt only
           hasOnlyAllowedChanges(['payments','balanceDue','status','updatedAt']) &&
+          // Validate non-negative payments when present
+          (request.resource.data.payments is list ? request.resource.data.payments.every(p => p.amount is number && p.amount >= 0) : true) &&
           request.resource.data.status in ['paid','partial','unpaid','void']
         )
       );
