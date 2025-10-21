@@ -44,9 +44,7 @@ export function aggregatePaymentModes(invoices: InvoiceDoc[]) {
   const map = new Map<string, number>();
   for (const m of modes) map.set(m, 0);
   for (const inv of invoices) {
-    for (const p of inv.payments || []) {
-      map.set(p.method, (map.get(p.method) || 0) + p.amount);
-    }
+    map.set(inv.paymentMethod, (map.get(inv.paymentMethod) || 0) + inv.grandTotal);
   }
   return modes.map(m => ({ method: m, amount: map.get(m) || 0 })).filter(x => x.amount > 0);
 }
@@ -73,7 +71,7 @@ export async function buildAccountingCsv(fromIso: string, toIso: string, opts?: 
   const rows: AccountingRow[] = [];
   for (const inv of invoices) {
     // choose a single payment mode to represent the invoice if filter specified or for display; if multiple, prefer first
-    const primaryPayment = inv.payments?.[0]?.method || '';
+  const primaryPayment = inv.paymentMethod || '';
     if (opts?.paymentMode && primaryPayment !== opts.paymentMode) continue;
     for (const it of inv.items) {
       const pd = pmap.get(it.productId);
