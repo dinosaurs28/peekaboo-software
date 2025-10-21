@@ -1,7 +1,7 @@
 "use client";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, orderBy, query, where, type DocumentData } from "firebase/firestore";
-import type { InvoiceDoc, ProductDoc } from "@/lib/models";
+import { collection, getDocs, orderBy, query, where, type DocumentData, Timestamp } from "firebase/firestore";
+import type { InvoiceDoc, ProductDoc, InventoryLogDoc } from "@/lib/models";
 import { toInvoiceDoc } from "@/lib/invoices";
 import { listProducts } from "@/lib/products";
 
@@ -110,4 +110,68 @@ export async function buildAccountingCsv(fromIso: string, toIso: string, opts?: 
   }
   const csv = lines.join('\n');
   return csv;
+}
+
+// Inventory movement summary (qty in/out/net) based on InventoryLogs
+export type MovementRow = {
+  productId: string;
+  name: string;
+  sku: string;
+  category?: string;
+  qtyIn: number; // sum of positive movements (purchase/return/adjustment+)
+  qtyOut: number; // sum of abs(negative movements) (sale/damage/adjustment-)
+  net: number; // qtyIn - qtyOut (or sum of quantityChange)
+};
+
+function tsFromIso(iso: string): Timestamp {
+  const d = new Date(iso);
+  return Timestamp.fromDate(d);
+}
+
+function toIsoFromCreatedAt(v: unknown): string {
+  // Utility if needed elsewhere; not used in aggregation now
+  try {
+    // Firestore Timestamp
+    if (v && typeof v === 'object' && 'toDate' in (v as any)) {
+      return (v as any).toDate().toISOString();
+    }
+  } catch {}
+  if (typeof v === 'string') return v;
+  return new Date().toISOString();
+}
+
+export async function listInventoryLogsInRange(fromIso: string, toIso: string): Promise<Array<{ id: string; data: InventoryLogDoc & { createdAt: any } }>> {
+  if (!db) return [];
+  const col = collection(db, 'InventoryLogs');
+  // Query by createdAt range; Firestore stores Timestamps, so use Timestamp bounds
+  const qy = query(col, where('createdAt', '>=', tsFromIso(fromIso)), where('createdAt', '<=', tsFromIso(toIso)), orderBy('createdAt', 'asc'));
+  const snap = await getDocs(qy);
+  return snap.docs.map(d => ({ id: d.id, data: d.data() as DocumentData as any }));
+}
+
+export async function aggregateInventoryMovement(fromIso: string, toIso: string, opts?: { category?: string }) {
+  const [logs, products] = await Promise.all([
+    listInventoryLogsInRange(fromIso, toIso),
+    listProducts(),
+  ]);
+  const pmap = new Map<string, ProductDoc>();
+  for (const p of products) if (p.id) pmap.set(p.id, p);
+
+  const rowsMap = new Map<string, MovementRow>();
+  for (const entry of logs) {
+    const l = entry.data as unknown as InventoryLogDoc & { productId: string; quantityChange: number; type: string };
+    const prod = pmap.get(l.productId);
+    if (!prod) continue;
+    if (opts?.category && (prod.category || '') !== opts.category) continue;
+    const key = l.productId;
+    let row = rowsMap.get(key);
+    if (!row) {
+      row = { productId: l.productId, name: prod.name, sku: prod.sku, category: prod.category, qtyIn: 0, qtyOut: 0, net: 0 };
+      rowsMap.set(key, row);
+    }
+    const delta = Number(l.quantityChange || 0);
+    if (delta >= 0) row.qtyIn += delta; else row.qtyOut += Math.abs(delta);
+    row.net += delta;
+  }
+  return Array.from(rowsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
