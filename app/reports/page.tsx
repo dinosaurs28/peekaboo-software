@@ -20,6 +20,7 @@ export default function ReportsIndexPage() {
             <li><Link className="underline" href="/reports/payments">Payment Mode Report</Link></li>
             <li><Link className="underline" href="/reports/accounting-export">Accounting CSV Export</Link></li>
             <li><Link className="underline" href="/reports/stock">Stock Report</Link></li>
+            <li><Link className="underline" href="/reports/movement">Inventory Movement Summary</Link></li>
           </ul>
         </main>
       </div>
