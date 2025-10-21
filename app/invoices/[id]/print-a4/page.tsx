@@ -5,23 +5,46 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import type { InvoiceDoc } from "@/lib/models";
 import { toInvoiceDoc } from "@/lib/invoices";
+import type { SettingsDoc } from "@/lib/models";
 
 export default function InvoicePrintA4Page() {
   const params = useParams();
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
   const [inv, setInv] = useState<InvoiceDoc | null>(null);
-  useEffect(() => { (async () => { if (!db || !id) return; const snap = await getDoc(doc(db, 'Invoices', id)); if (snap.exists()) setInv(toInvoiceDoc(snap.id, snap.data() as any)); })(); }, [id]);
+  const [settings, setSettings] = useState<Partial<SettingsDoc> | null>(null);
+  useEffect(() => {
+    (async () => {
+      if (!db || !id) return;
+      const invSnap = await getDoc(doc(db, 'Invoices', id));
+      if (invSnap.exists()) setInv(toInvoiceDoc(invSnap.id, invSnap.data() as any));
+      try {
+        const sSnap = await getDoc(doc(db, 'Settings', 'app'));
+        if (sSnap.exists()) setSettings(sSnap.data() as any);
+      } catch { }
+    })();
+  }, [id]);
 
   useEffect(() => { if (inv) setTimeout(() => window.print(), 300); }, [inv]);
 
   if (!inv) return <div className="p-6">Preparing…</div>;
+  const bizName = settings?.businessName || 'Your Store Name';
+  const addrParts = [
+    settings?.addressLine1,
+    settings?.addressLine2,
+    [settings?.city, settings?.state, settings?.pinCode].filter(Boolean).join(', ')
+  ].filter(p => !!p && String(p).trim().length > 0) as string[];
+  const addr1 = addrParts.join(', ') || 'Address line 1, City, State, PIN';
+  const gstin = settings?.gstin || 'XXYYYYZZZZ';
+  const logo = settings?.logoUrl;
+  const footer = settings?.receiptFooterNote || 'Thank you for shopping with us!';
   return (
     <div className="p-8 print:p-0 max-w-3xl mx-auto text-sm">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <div className="text-xl font-semibold">Your Store Name</div>
-          <div className="text-xs text-muted-foreground">Address line 1, City, State, PIN</div>
-          <div className="text-xs text-muted-foreground">GSTIN: XXYYYYZZZZ</div>
+          {logo ? <img src={logo} alt="Logo" className="h-12 mb-2" /> : null}
+          <div className="text-xl font-semibold">{bizName}</div>
+          <div className="text-xs text-muted-foreground">{addr1}</div>
+          <div className="text-xs text-muted-foreground">GSTIN: {gstin}</div>
         </div>
         <div className="text-right">
           <div className="text-lg font-semibold">Invoice</div>
@@ -64,7 +87,7 @@ export default function InvoicePrintA4Page() {
         <div className="flex justify-between"><span>GST</span><span>₹{(inv.taxTotal ?? 0).toFixed(2)}</span></div>
         <div className="flex justify-between font-semibold text-base"><span>Grand Total</span><span>₹{inv.grandTotal.toFixed(2)}</span></div>
       </div>
-      <div className="mt-8 text-xs text-muted-foreground">Thank you for shopping with us!</div>
+      <div className="mt-8 text-xs text-muted-foreground">{footer}</div>
     </div>
   );
 }

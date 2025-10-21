@@ -150,6 +150,17 @@ export interface SettingsDoc extends BaseDoc {
   nextInvoiceSequence?: number;
   lowStockThresholdDefault?: number;
   theme?: 'light' | 'dark' | 'system';
+  // Branding fields for invoices/receipts (optional)
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  pinCode?: string;
+  gstin?: string;
+  phone?: string;
+  email?: string;
+  logoUrl?: string; // public URL (optional)
+  receiptFooterNote?: string;
 }
 
 // Collection name constants (helps avoid typos)
