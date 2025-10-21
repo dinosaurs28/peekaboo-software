@@ -72,6 +72,7 @@ export default function InvoiceDetailsPage() {
                 <div className="text-sm text-muted-foreground">Issued: {new Date(invoice.issuedAt).toLocaleString()}</div>
                 <div className="text-sm">Cashier: {invoice.cashierName || invoice.cashierUserId}</div>
                 {invoice.customerId && <div className="text-sm">Customer: {invoice.customerId}</div>}
+                <div className="text-sm">Payment: {invoice.paymentMethod.toUpperCase()}{invoice.paymentReferenceId ? ` • ${invoice.paymentReferenceId}` : ''}</div>
               </div>
             )}
           </Card>
