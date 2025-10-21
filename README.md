@@ -106,7 +106,7 @@ What’s done
 	- POS panel: fast scan/search, multi-item cart, item-level and bill-level discounts, keyboard shortcuts.
 	- GST calculation per line (taxRatePct) with proportional bill-discount allocation; invoice totals reflect tax.
 	- Invoice creation with cashier/customer linkage; invoice list + details; admin print for A4 and 80mm thermal receipt.
-	- Multi-payment + split payments (Cash/Card/UPI/Wallet) with validation.
+	- Single payment (Cash/Card/UPI/Wallet); split payments removed by design.
 - Phase 4: Customers & Offers
 	- Customer capture in POS (create-if-missing by phone); customers list with search; customer detail with real-time purchase history + metrics (total spend, visits, last purchase, top items).
 	- Offers module (admin): create/edit/list with active dates, product/category/bill targeting, flat/%/BOGO(same item), DOB-month-only, event tag, priority/exclusive.
@@ -147,7 +147,7 @@ POS & billing
 - Item discount: switch ₹/% and verify math per line.
 - Bill discount: switch ₹/% and verify totals.
 - GST: set product taxRatePct; verify line tax and invoice taxTotal; bill-discount reduces tax base proportionally.
-- Split payments: enable, add rows, amounts sum to total; validation blocks mismatch; single payment still works.
+- Payment: choose one method (cash/card/upi/wallet); optional reference; checkout succeeds with a single payment recorded.
 
 Customers
 - Enter phone: existing customer auto-fills name/email/DOB; new phone requires name; created on checkout.
