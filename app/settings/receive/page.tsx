@@ -7,11 +7,13 @@ import { Card } from "@/components/ui/card";
 import { decodeBarcode } from "@/lib/barcodes";
 import { findProductBySKU } from "@/lib/products";
 import { receiveStock } from "@/lib/pos";
+import { useToast } from "@/components/ui/toast";
 
 type ReceiveLine = { productId: string; sku: string; name: string; qty: number; unitCost?: number };
 
 export default function ReceiveStockPage() {
   const { user, role, loading } = useAuth();
+  const { toast } = useToast();
   const [scanValue, setScanValue] = useState("");
   const [lines, setLines] = useState<ReceiveLine[]>([]);
   const [note, setNote] = useState("");
@@ -20,8 +22,69 @@ export default function ReceiveStockPage() {
   const [docDate, setDocDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const bufferRef = useRef<string>("");
+  const lastKeyTsRef = useRef<number>(0);
+  const idleTimerRef = useRef<number | null>(null);
+  const SCAN_IDLE_MS = 120; // finalize scan after this idle
+  const SCAN_BURST_GAP_MS = 35; // distinguish fast scanner from slow typing
 
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  // Keep the input focused (some browsers shift focus on print dialogs or clicks)
+  function ensureFocus() {
+    const el = inputRef.current;
+    if (el && document.activeElement !== el) el.focus();
+  }
+
+  useEffect(() => {
+    function finalizeBuffer() {
+      const value = bufferRef.current.trim();
+      if (value) {
+        setScanValue(value);
+        // Trigger the same flow as submit
+        processScanValue(value);
+      }
+      bufferRef.current = "";
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      // Only process visible page
+      if (document.hidden) return;
+
+      const now = performance.now();
+      const gap = now - lastKeyTsRef.current;
+      lastKeyTsRef.current = now;
+
+      // Printable character
+      if (e.key.length === 1) {
+        // If long gap, treat as new scan
+        if (gap > 300) bufferRef.current = "";
+        bufferRef.current += e.key;
+        // Mirror into input for visibility
+        setScanValue(bufferRef.current);
+        // Restart idle timer
+        if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = window.setTimeout(finalizeBuffer, SCAN_IDLE_MS);
+        return;
+      }
+      // Submit on Enter or Tab (many scanners use these as suffix)
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+        finalizeBuffer();
+        ensureFocus();
+        return;
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    const id = window.setInterval(ensureFocus, 1000);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.clearInterval(id);
+      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+    };
+  }, []);
 
   const canUse = useMemo(() => !loading && user && role === 'admin', [loading, user, role]);
   if (loading) return <div className="p-6">Loading…</div>;
@@ -31,12 +94,16 @@ export default function ReceiveStockPage() {
     e.preventDefault();
     const raw = scanValue.trim();
     if (!raw) return;
+    await processScanValue(raw);
     setScanValue("");
+  }
+
+  async function processScanValue(raw: string) {
     const decoded = decodeBarcode(raw);
     const sku = decoded?.sku || raw;
     const prod = await findProductBySKU(sku);
     if (!prod) {
-      alert(`SKU not found: ${sku}. Please add the product first in Products, then generate barcode.`);
+      toast({ title: 'Scan failed', description: `SKU not found: ${sku}`, variant: 'destructive' });
       return;
     }
     setLines(prev => {
@@ -48,6 +115,7 @@ export default function ReceiveStockPage() {
       }
       return [...prev, { productId: prod.id!, sku: prod.sku, name: prod.name, qty: 1 }];
     });
+    toast({ title: 'Item added', description: `${prod.name}`, variant: 'success', duration: 1500 });
   }
 
   function setQty(id: string, qty: number) {
@@ -72,13 +140,13 @@ export default function ReceiveStockPage() {
         note: note || undefined,
         lines: lines.map(l => ({ productId: l.productId, sku: l.sku, name: l.name, qty: l.qty, unitCost: l.unitCost })),
       });
-      alert(`Stock received. Receipt ID: ${rid}`);
+      toast({ title: 'Stock received', description: `Receipt ${rid}`, variant: 'success' });
       setLines([]);
       setNote("");
       setSupplierName("");
       setDocNo("");
     } catch (e) {
-      alert(`Failed to post receipt: ${e instanceof Error ? e.message : String(e)}`);
+      toast({ title: 'Receive failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
     } finally {
       setBusy(false);
     }
@@ -93,7 +161,17 @@ export default function ReceiveStockPage() {
       </div>
       <Card className="p-4 space-y-3">
         <form onSubmit={handleScan} className="flex gap-2 items-center">
-          <Input ref={inputRef} value={scanValue} onChange={e => setScanValue(e.target.value)} placeholder="Scan PB|CAT|SKU or SKU…" />
+          <Input
+            ref={inputRef}
+            value={scanValue}
+            onChange={e => setScanValue(e.target.value)}
+            placeholder="Scan PB|CAT|SKU or SKU…"
+            onBlur={ensureFocus}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="text"
+          />
           <Button type="submit">Add</Button>
         </form>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
