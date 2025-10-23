@@ -47,6 +47,17 @@ export default function InvoiceDetailsPage() {
   if (!user) return null;
 
   const canPrint = role === "admin";
+  const canExchange = useMemo(() => {
+    if (!invoice) return false;
+    try {
+      const issued = new Date(invoice.issuedAt);
+      const now = new Date();
+      // calendar-day window check (client-side rough check; server enforces precisely)
+      const ms = now.getTime() - issued.getTime();
+      const days = ms / (1000 * 60 * 60 * 24);
+      return days <= 7.0;
+    } catch { return false; }
+  }, [invoice]);
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
@@ -57,12 +68,17 @@ export default function InvoiceDetailsPage() {
           <div className="flex items-center justify-between">
             <Button variant="outline" onClick={() => { window.location.href = "/invoices"; }}>← Back</Button>
             <h1 className="text-xl font-semibold">Invoice {invoice?.invoiceNumber || id}</h1>
-            {canPrint && (
-              <div className="flex gap-2">
-                <Button onClick={() => window.open(window.location.pathname + "/print-a4", "_blank")}>Print A4</Button>
-                <Button variant="outline" onClick={() => window.open(window.location.pathname + "/print-80mm", "_blank")}>Print 80mm</Button>
-              </div>
-            )}
+            <div className="flex gap-2">
+              {canPrint && (
+                <>
+                  <Button onClick={() => window.open(window.location.pathname + "/print-a4", "_blank")}>Print A4</Button>
+                  <Button variant="outline" onClick={() => window.open(window.location.pathname + "/print-80mm", "_blank")}>Print 80mm</Button>
+                </>
+              )}
+              <Button variant="secondary" disabled={!canExchange} onClick={() => { if (canExchange) window.location.href = window.location.pathname + "/exchange"; }}>
+                Exchange Items
+              </Button>
+            </div>
           </div>
           <Card className="p-4 space-y-2">
             {pending && <div className="text-sm text-muted-foreground">Loading invoice…</div>}
