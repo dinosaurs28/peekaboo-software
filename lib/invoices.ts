@@ -49,6 +49,8 @@ export function toInvoiceDoc(id: string, data: Record<string, unknown>): Invoice
     issuedAt: asString(data.issuedAt, now),
     createdAt: asString(data.createdAt, now),
     updatedAt: asString(data.updatedAt, now),
+    exchangeOfInvoiceId: typeof data.exchangeOfInvoiceId === 'string' ? data.exchangeOfInvoiceId : undefined,
+    exchangeId: typeof data.exchangeId === 'string' ? data.exchangeId : undefined,
   };
 }
 
