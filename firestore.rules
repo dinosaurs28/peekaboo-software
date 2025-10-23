@@ -199,6 +199,20 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Exchanges
+    match /Exchanges/{id} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+
+    // Refunds
+    match /Refunds/{id} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;
