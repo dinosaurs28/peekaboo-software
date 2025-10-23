@@ -40,6 +40,7 @@ export default function CustomersPage() {
                   <th className="px-3 py-2">Name</th>
                   <th className="px-3 py-2">Phone</th>
                   <th className="px-3 py-2">Email</th>
+                  <th className="px-3 py-2 text-right">Points</th>
                   <th className="px-3 py-2">Actions</th>
                 </tr>
               </thead>
@@ -49,11 +50,12 @@ export default function CustomersPage() {
                     <td className="px-3 py-2">{c.name}</td>
                     <td className="px-3 py-2">{c.phone || '-'}</td>
                     <td className="px-3 py-2">{c.email || '-'}</td>
+                    <td className="px-3 py-2 text-right">{Math.max(0, Number(c.loyaltyPoints || 0))}</td>
                     <td className="px-3 py-2"><Link href={`/customers/${c.id}`} className="underline">View</Link></td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td className="px-3 py-6 text-center text-muted-foreground" colSpan={4}>No customers</td></tr>
+                  <tr><td className="px-3 py-6 text-center text-muted-foreground" colSpan={5}>No customers</td></tr>
                 )}
               </tbody>
             </table>

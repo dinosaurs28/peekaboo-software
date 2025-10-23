@@ -92,7 +92,7 @@ export default function CustomerDetailPage() {
                 <div className="text-sm text-muted-foreground">{cust.phone || ''} {cust.email ? `• ${cust.email}` : ''}</div>
                 {cust.kidsDob && <div className="text-xs text-muted-foreground">Kid&apos;s DOB: {cust.kidsDob}</div>}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="border rounded-md p-4">
                   <div className="text-sm text-muted-foreground">Total Spend</div>
                   <div className="text-xl font-semibold">₹{metrics.totalSpend.toFixed(2)}</div>
@@ -104,6 +104,10 @@ export default function CustomerDetailPage() {
                 <div className="border rounded-md p-4">
                   <div className="text-sm text-muted-foreground">Last Purchase</div>
                   <div className="text-xl font-semibold">{metrics.lastPurchase ? new Date(metrics.lastPurchase).toLocaleDateString() : '—'}</div>
+                </div>
+                <div className="border rounded-md p-4">
+                  <div className="text-sm text-muted-foreground">Loyalty Points</div>
+                  <div className="text-xl font-semibold">{Math.max(0, Number(cust.loyaltyPoints || 0))}</div>
                 </div>
               </div>
               {metrics.topItems.length > 0 && (
