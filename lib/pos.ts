@@ -138,6 +138,15 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    // Loyalty: award points to customer if present
+    if (input.customerId) {
+      const points = Math.floor(grandTotal / 100);
+      if (points > 0 || grandTotal > 0) {
+        const cRef = doc(dbx, COLLECTIONS.customers, input.customerId);
+        tx.set(cRef, { loyaltyPoints: increment(points), totalSpend: increment(grandTotal), updatedAt: serverTimestamp() }, { merge: true });
+      }
+    }
     return invRef.id;
   });
 

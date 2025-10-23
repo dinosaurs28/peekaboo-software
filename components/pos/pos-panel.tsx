@@ -37,7 +37,7 @@ export function PosPanel() {
   const [custName, setCustName] = useState("");
   const [custEmail, setCustEmail] = useState("");
   const [custKidsDob, setCustKidsDob] = useState("");
-  const [custFound, setCustFound] = useState<{ id: string; name: string } | null>(null);
+  const [custFound, setCustFound] = useState<{ id: string; name: string; points?: number } | null>(null);
   const [custChecking, setCustChecking] = useState(false);
 
   // Focus the input to capture scanner entries
@@ -455,7 +455,7 @@ export function PosPanel() {
       setCustChecking(true);
       const c = await findCustomerByPhone(phone);
       if (c) {
-        setCustFound({ id: c.id!, name: c.name });
+        setCustFound({ id: c.id!, name: c.name, points: Math.max(0, Number(c.loyaltyPoints || 0)) });
         setCustName(c.name || "");
         setCustEmail(c.email || "");
         setCustKidsDob(c.kidsDob || "");
@@ -701,7 +701,7 @@ export function PosPanel() {
             <Button type="button" variant="outline" onClick={lookupCustomerByPhone} disabled={custChecking}>{custChecking ? 'Checking…' : 'Check'}</Button>
           </div>
           {custFound ? (
-            <div className="text-xs text-muted-foreground">Existing customer: <span className="font-medium">{custFound.name}</span></div>
+            <div className="text-xs text-muted-foreground">Existing customer: <span className="font-medium">{custFound.name}</span>{typeof custFound.points === 'number' ? <span className="ml-2">• Points: <span className="font-medium">{custFound.points}</span></span> : null}</div>
           ) : (
             <div className="space-y-2">
               <Input placeholder="Customer name" value={custName} onChange={(e) => setCustName(e.target.value)} />
