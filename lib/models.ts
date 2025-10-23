@@ -66,6 +66,9 @@ export interface InvoiceDoc extends BaseDoc {
   cashierName?: string;
   status: 'paid' | 'partial' | 'unpaid' | 'void';
   issuedAt: string; // sale timestamp
+  // Exchange metadata (optional)
+  exchangeOfInvoiceId?: string; // original invoice id if this invoice was created for an exchange
+  exchangeId?: string; // link to Exchanges doc
 }
 
 export interface OfferDoc extends BaseDoc {
@@ -163,6 +166,43 @@ export interface SettingsDoc extends BaseDoc {
   receiptFooterNote?: string;
 }
 
+// Exchange & Refunds
+export interface ExchangeReturnLine {
+  productId: string;
+  qty: number;
+  defect?: boolean; // if true, do not increase sellable stock
+  creditPerUnit: number; // computed based on original invoice
+  creditTotal: number; // qty * creditPerUnit
+}
+
+export interface ExchangeNewLine {
+  productId: string;
+  qty: number;
+  unitPrice: number; // current price used for the exchanged item
+  lineTotal: number; // qty * unitPrice (before discount/credit)
+}
+
+export interface ExchangeDoc extends BaseDoc {
+  originalInvoiceId: string;
+  returned: ExchangeReturnLine[];
+  newItems: ExchangeNewLine[];
+  totals: {
+    returnCredit: number;
+    newSubtotal: number;
+    difference: number; // newSubtotal - returnCredit; >0 pay; <0 refund
+  };
+  payment?: { type: 'pay' | 'refund'; method: 'cash' | 'card' | 'upi' | 'wallet'; referenceId?: string };
+  createdByUserId: string;
+}
+
+export interface RefundDoc extends BaseDoc {
+  exchangeId: string;
+  amount: number;
+  method: 'cash' | 'card' | 'upi' | 'wallet';
+  referenceId?: string;
+  createdByUserId: string;
+}
+
 // Collection name constants (helps avoid typos)
 export const COLLECTIONS = {
   users: 'Users',
@@ -175,7 +215,9 @@ export const COLLECTIONS = {
   goodsReceipts: 'GoodsReceipts',
   barcodes: 'Barcodes',
   reports: 'Reports',
-  settings: 'Settings'
+  settings: 'Settings',
+  exchanges: 'Exchanges',
+  refunds: 'Refunds',
 } as const;
 
 // Common product categories for initial UI; can be extended in Settings later
