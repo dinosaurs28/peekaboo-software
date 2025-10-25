@@ -6,6 +6,8 @@ import { checkoutCart } from "./pos";
 import { performExchange } from "./exchange";
 import { receiveStock } from "./pos";
 import { COLLECTIONS } from "./models";
+import { auth } from "./firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export type OfflineOpType = "checkout" | "exchange" | "receive";
 export type OfflineOp = {
@@ -109,6 +111,10 @@ export async function processOpById(id: string): Promise<boolean> {
 let running = false;
 export async function processQueue(onProgress?: (left: number) => void): Promise<void> {
   if (running) return;
+  // If Firebase Auth is available but no user is signed in yet, pause processing.
+  if (auth && !auth.currentUser) {
+    return;
+  }
   running = true;
   try {
     const ops = (await listOps()).sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
@@ -154,12 +160,27 @@ let started = false;
 export function ensureSyncStarted() {
   if (started) return;
   started = true;
-  function tryProcess() {
-    // Only process if online and user is likely authenticated (best-effort: wait a tick to allow Auth init)
+  async function triggerProcessWhenReady() {
     if (!navigator.onLine) return;
-    setTimeout(() => processQueue().catch((e) => console.error('processQueue failed', e)), 250);
+    // If auth is not initialized, fall back to a short delay and try.
+    if (!auth) {
+      setTimeout(() => processQueue().catch((e) => console.error('processQueue failed', e)), 250);
+      return;
+    }
+    // If a user is already signed in, process immediately.
+    if (auth.currentUser) {
+      await processQueue().catch((e) => console.error('processQueue failed', e));
+      return;
+    }
+    // Otherwise, wait until a user signs in before processing.
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) {
+        unsub();
+        processQueue().catch((e) => console.error('processQueue failed', e));
+      }
+    });
   }
-  window.addEventListener('online', tryProcess);
-  // attempt an initial sync when we start if online
-  tryProcess();
+  window.addEventListener('online', triggerProcessWhenReady);
+  // attempt an initial sync when we start if online/auth-ready
+  triggerProcessWhenReady();
 }
