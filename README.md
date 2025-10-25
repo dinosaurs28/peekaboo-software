@@ -1,72 +1,123 @@
-## Peekaboo POS – Client Brief
+## Peekaboo POS – Launch Checklist and Roadmap
 
-This document summarizes what’s built, what was added recently, and key decision options to discuss before we implement more. It’s written for a quick client review and go/no‑go decisions per item.
+This file lists the final quick polishes to complete before build/launch, plus a roadmap of future additions that can follow without blocking go‑live.
 
-### What’s ready today (ship-ready)
-- Products & Categories: Add/edit products (SKU, HSN, price, GST), category management, low‑stock alerts.
-- Inventory: Real‑time stock adjustments, receiving with Goods Receipts, Inventory Logs and viewer.
-- Barcodes: PB|CAT|SKU format, A4 label PDF export, optional “add to stock on export.”
-- POS & Billing: Fast scan/search, cart with item/bill discounts, GST calculation (per product slab), single payment (cash/card/UPI/wallet), sequential invoice numbers, A4 and 80mm print.
-- Customers & Offers: Customer profiles with history; offers engine (flat/%/BOGO, category/product targeting, DOB‑month, priority/exclusive) with POS apply/clear.
-- Reports: Sales (day/week/month), Payment Mode, Accounting CSV/XLSX; Stock Report; Inventory Movement Summary (qty in/out/net by product and range).
-- Settings & Branding: Business Profile (logo, name, address, GSTIN, footer), invoice prefix/counter.
-- Security & Integrity: Role‑based Firestore rules (admin/cashier), validations to prevent negative values, composite indexes configured.
+---
 
-### Recent additions
-- Business Profile branding reflected in A4/80mm prints.
-- Inventory Movement Summary report (date range, category filter, CSV/XLSX).
-- Barcode Generator option to auto‑receive stock when exporting labels (creates Goods Receipt + logs).
+## Final pre‑launch polish checklist
 
-### Decisions to make (pick what matters now)
-1) Returns/Void/Exchange
-   - Scope: Allow full/partial returns with stock reversal and invoice annotation; write InventoryLogs (type=return/void). Optional: exchange flow that creates a new invoice difference.
-   - Impact: Essential for after‑sales corrections and customer service.
+Essentials to complete and verify before shipping:
 
-2) Stocktake (Cycle Counts)
-   - Scope: Count sheet UI → enter actuals per SKU → system posts adjustments (reason=stocktake) with notes.
-   - Impact: Improves inventory accuracy over time; recommended monthly/quarterly.
+1) Firebase project configuration
+- Fill `.env.local` with `NEXT_PUBLIC_FIREBASE_*` required by `lib/firebase.ts` (prod project).
+- Verify app boots without “Firebase not initialized” warnings in the browser console.
 
-3) Shift Close / Day‑End Reconciliation
-   - Scope: Open/close shift, record cash drawer opening/closing, cash‑in/out, and a Z‑report (sales totals by method, refunds, net expected cash).
-   - Impact: Operational confidence for cash handling; useful even with UPI/card heavy stores.
+2) Firestore security rules and indexes
+- Deploy rules and composite indexes:
+  - Firestore Rules: admin/cashier RBAC, validations, and new Exchanges/Refunds collections.
+  - Composite Indexes: Invoices and InventoryLogs used by reports and listings.
+- Validate read/write access from a Cashier user for POS/Receive only.
 
-4) GST Enhancements (India)
-   - Scope: Split CGST/SGST vs IGST based on place of supply; HSN‑wise tax summary on invoices; rounding rules; optional GSTR‑1 friendly export.
-   - Impact: Compliance polish; discuss necessity with accountant.
+3) Business Profile & numbering
+- Set business name, address, GSTIN, phone/email, logo URL, receipt footer in Settings.
+- Configure invoice prefix and ensure sequence increments on every sale/exchange invoice.
 
-5) Purchase Orders (optional)
-   - Scope: Create PO → receive partially/fully into Goods Receipts; close PO on full receipt.
-   - Impact: Valuable if you plan supplier ordering inside the system; otherwise defer.
+4) Prints and hardware
+- Print A4 and 80mm invoices from an actual invoice:
+  - Check logo, address, GSTIN, totals, and date/time formatting.
+- Label printing (A4 labels): verify sizing and scanability with your barcode scanner.
+- Scanner config: HID keyboard mode with Enter/Tab suffix; test on POS and Receive pages.
 
-6) PWA / Offline resilience (optional)
-   - Scope: Cache POS shell; queue scans/checkout when offline; replay on reconnect with duplicate guards.
-   - Impact: Great for unreliable internet; adds complexity—enable only if needed.
+5) Offline resilience (quick flight)
+- Go offline →
+  - POS: scan from cached catalog and perform checkout (should queue).
+  - Receive: scan and “Post Receipt” (should queue).
+  - Exchange: return + new items (should queue).
+- Reconnect → queued items should sync exactly once; stock and logs must reconcile.
+  - Note: catalog cache warms when POS loads online once. Open Dashboard/POS online before attempting offline scans.
 
-7) Loyalty (optional)
-   - Scope: Earn points on net spend; redeem at POS; show balance on customer profile.
-   - Impact: Marketing lever; implement if you plan ongoing campaigns.
+6) PWA polish
+- Service worker is registered; add app icons (192/512) to make it installable.
+- Link the manifest if not yet linked (via `app/manifest.ts` or metadata `manifest` in `app/layout.tsx`).
+- Optional: pin a SW version bump (`CACHE_VERSION` in `public/sw.js`) for controlled updates.
 
-### Our recommendation (start with these)
-1) Returns/Void/Exchange
-2) Stocktake (Cycle Counts)
-3) Shift Close / Day‑End Reconciliation
-4) GST Enhancements (limited: HSN summary + CGST/SGST split on invoice header)
+7) QA and reports
+- Run through Testing.md items (sales, payments, stock, movement, accounting CSV/XLSX).
+- Spot‑check Inventory Logs for sale/receive/return/exchange/defect paths.
 
-These deliver the highest operational and compliance value with focused effort.
+8) Data hygiene & backups
+- Export Products and Settings to CSV/JSON as a seed backup before launch.
+- Confirm currency symbol (₹) and number formats across the app.
 
-### Items to defer unless required
-- Full Purchase Orders workflow
-- PWA/offline queueing
-- Loyalty points program
+9) Build & deploy (summary)
+- Install dependencies and build, then deploy hosting + Firestore config.
+- Verify envs and public URLs (logo, manifest) resolve over HTTPS.
 
-### Acceptance checklist (quick)
-- Invoices: Sequential numbers; prints show correct branding; GST math aligns with product tax rates and bill discounts.
-- Inventory: Sales decrement and receiving increment stock with InventoryLogs; Movement Summary matches activity.
-- Reports: Sales, Payments, Stock, Accounting CSV/XLSX export the expected fields.
-- Access & validation: Cashier/Admin rights respected; no negative qty/discounts allowed; indexes deployed (no runtime prompts).
+---
 
-### Notes for deployment
-- Firestore security and indexes are configured. Deploy rules/indexes once connected to your Firebase project.
-- Optional email/PDF generation for invoices can be added later; current flow uses the browser print.
+## Optional pre‑launch niceties (non‑blocking)
 
-If you approve the recommendations, we’ll proceed with Returns/Void, Stocktake, and Shift Close next, followed by targeted GST enhancements.
+- Idempotency guard: write a dedicated `Ops/{opId}` document inside the same transaction for checkout/exchange to make replays strictly duplicate‑proof.
+- Queue screen: minimal UI to view/retry/remove failed offline ops.
+- Auth‑aware queue start: wait for Firebase Auth ready before running `processQueue()`; show a paused state if not signed in.
+- PWA icons and theme meta: add platform icons and verify install banner.
+- Basic monitoring: Sentry or error toast bundling for unexpected failures.
+
+---
+
+## Post‑launch roadmap (future additions)
+
+Operations & Inventory
+- Shift open/close with Z‑report (cash expected vs counted, refunds, net).
+- Stocktake / cycle counts with variance posting (reason=stocktake), CSV import/export.
+- Purchase Orders: Suppliers, PO→partial/complete receive into Goods Receipts.
+- Multi‑store readiness: store/location field, per‑store stock and reports.
+
+Compliance (India)
+- GST split (CGST/SGST vs IGST) based on place of supply.
+- HSN summary on invoices and a GSTR‑1/returns‑friendly export.
+- Rounding and invoice footer compliance notes.
+
+Sales, Offers, Loyalty
+- Loyalty redemption rules (points→discount), configurable earn/redeem rates and caps.
+- Offers engine enhancements: cross‑SKU BOGO, stacking/priority policies, event‑based promos.
+- Customer comms: birthday/event nudges; export segments.
+
+Printing & UX
+- Dedicated 4" label printer mode (CSS @page, density tuning, print dialog presets) beyond A4 PDF.
+- Email/PDF invoice delivery; WhatsApp share link.
+- Accessibility polish (focus order, ARIA landmarks) and keyboard shortcuts help.
+
+Resilience & DX
+- Workbox/next‑pwa strategies (stale‑while‑revalidate for static, background sync for queue).
+- Firestore offline persistence (if desired) in addition to the explicit queue.
+- Dead‑letter queue with thresholds and audit trail for ops.
+- Telemetry & logs: Sentry, performance marks, Cloud logs.
+
+Data & Integrations
+- Bulk import/export for Products/Customers (CSV/XLSX), with validation preview.
+- Payment integrations (UPI intent, card gateways) for reference capture automation.
+- Accounting integrations (Tally/Zoho) via CSV/Bridge API.
+
+---
+
+## Build & deploy quick start
+
+1) Install and build
+
+```powershell
+npm install
+npm run build
+```
+
+2) Deploy config (example)
+- Firestore rules/indexes:
+```powershell
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+3) Host the app (Vercel/Cloud Run/Firebase Hosting). Ensure `.env` is present in the runtime environment.
+
+---
+
+Questions or changes? Open an issue with the checklist item and desired outcome; we’ll scope it as a polish or a roadmap feature.
