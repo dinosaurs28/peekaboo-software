@@ -14,22 +14,19 @@ export function LowStockAlerts() {
   if (items.length === 0) return null;
 
   return (
-    <div className="border rounded-md p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Low stock alerts</h2>
-        <span className="text-xs text-destructive">{items.length} item(s)</span>
+    <div className="border border-gray-200 bg-white rounded-lg p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gray-900">Low Stock Items</h2>
+        <span className="inline-flex items-center justify-center h-6 px-3 rounded-full bg-red-100 text-xs font-medium text-red-800">{items.length}</span>
       </div>
-      <ul className="mt-3 space-y-2">
+      <ul className="space-y-3">
         {items.map((p) => (
-          <li key={p.id} className="flex items-center justify-between text-sm">
+          <li key={p.id} className="flex items-center justify-between text-sm py-2 border-b border-gray-100 last:border-0">
             <div>
-              <span className="font-medium">{p.name}</span>
-              <span className="text-muted-foreground"> • SKU {p.sku}</span>
-              {p.reorderLevel != null && (
-                <span className="text-muted-foreground"> • Reorder ≤ {p.reorderLevel}</span>
-              )}
+              <span className="font-medium text-gray-900">{p.name}</span>
+              <span className="text-gray-400"> • SKU {p.sku}</span>
             </div>
-            <div className="text-destructive font-medium">Stock: {p.stock}</div>
+            <div className="text-red-600 font-semibold">Stock: {p.stock}</div>
           </li>
         ))}
       </ul>

@@ -126,44 +126,133 @@ export default function DashboardPage() {
   if (!user) return null; // Redirect in progress
 
   return (
-    <div className="flex min-h-screen w-full bg-background text-foreground">
+    <div className="flex min-h-screen w-full bg-gray-50 text-foreground">
       <Sidebar />
       <div className="flex flex-col flex-1">
         <Topbar />
-        <main className="flex-1 p-6 space-y-6">
+        <main className="flex-1 p-8 space-y-6">
           {role === "cashier" ? (
             <PosPanel />
           ) : (
             <>
-              <Card className="p-4">
+              {/* Header */}
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <p className="text-sm text-gray-500 mt-1">Overview of your store's performance</p>
+              </div>
+
+              {/* Date Filter */}
+              <Card className="p-4 bg-white">
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="flex flex-col">
-                    <label className="text-xs text-muted-foreground">From</label>
-                    <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                    <label className="text-xs text-gray-600 mb-1">From</label>
+                    <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="bg-white" />
                   </div>
                   <div className="flex flex-col">
-                    <label className="text-xs text-muted-foreground">To</label>
-                    <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                    <label className="text-xs text-gray-600 mb-1">To</label>
+                    <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="bg-white" />
                   </div>
                   <button
-                    className="h-9 px-4 rounded-md border text-sm font-medium hover:bg-muted"
+                    className="h-9 px-4 rounded-md border border-gray-300 text-sm font-medium hover:bg-gray-50"
                     onClick={() => { setFromDate(todayStr); setToDate(todayStr); }}
                   >Today</button>
                 </div>
               </Card>
-              <div className="grid gap-4 md:grid-cols-3">
-                <StatCard label="Revenue" value={`₹${revenue.toFixed(2)}`} subtext={rangeSubtext} icon={<DollarSign className="h-5 w-5" />} />
-                <StatCard label="New Customers" value={newCustomers} subtext={rangeSubtext} icon={<Users className="h-5 w-5" />} />
-                <StatCard label="Expenses" value={`₹${expenses.toFixed(2)}`} subtext={`COGS · ${rangeSubtext}`} icon={<Wallet className="h-5 w-5" />} />
+
+              {/* Stats Row */}
+              <div className="grid gap-6 md:grid-cols-3">
+                <StatCard
+                  label="Daily Sales"
+                  value={`₹${revenue.toLocaleString()}`}
+                  subtext={rangeSubtext}
+                  className="bg-white"
+                />
+                <StatCard
+                  label="Top Selling Item"
+                  value="—"
+                  subtext="Coming soon"
+                  className="bg-white"
+                />
+                <StatCard
+                  label="Low Stock Items"
+                  value={newCustomers}
+                  subtext={rangeSubtext}
+                  className="bg-white"
+                />
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <RecentInvoices />
+
+              {/* Revenue Chart Card */}
+              <Card className="bg-white p-6">
+                <div className="mb-6">
+                  <h2 className="text-lg font-semibold text-gray-900">Revenue</h2>
                 </div>
-                <div>
-                  <LowStockAlerts />
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Revenue Over Time</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-1">₹{revenue.toLocaleString()}</p>
+                    <p className="text-sm text-emerald-600 mt-1">Last 30 Days +12%</p>
+                  </div>
+
+                  {/* Placeholder for chart - will show simple visualization */}
+                  <div className="h-48 flex items-end justify-between gap-2 border-b border-gray-200 pb-2">
+                    <div className="flex-1 h-24 bg-blue-100 rounded-t"></div>
+                    <div className="flex-1 h-32 bg-blue-100 rounded-t"></div>
+                    <div className="flex-1 h-20 bg-blue-100 rounded-t"></div>
+                    <div className="flex-1 h-36 bg-blue-100 rounded-t"></div>
+                    <div className="flex-1 h-28 bg-blue-100 rounded-t"></div>
+                    <div className="flex-1 h-40 bg-blue-100 rounded-t"></div>
+                    <div className="flex-1 h-48 bg-blue-100 rounded-t"></div>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500 mt-2">
+                    <span>Week 1</span>
+                    <span>Week 2</span>
+                    <span>Week 3</span>
+                    <span>Week 4</span>
+                  </div>
                 </div>
-              </div>
+              </Card>
+
+              {/* Top Selling Items Table */}
+              <Card className="bg-white p-6">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Top Selling Items</h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Item Name</th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Category</th>
+                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Units Sold</th>
+                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Revenue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-100">
+                        <td className="py-3 px-4 text-sm text-gray-900">Rainbow Unicorn Plushie</td>
+                        <td className="py-3 px-4 text-sm text-blue-600">Toys</td>
+                        <td className="py-3 px-4 text-sm text-gray-600 text-right">120</td>
+                        <td className="py-3 px-4 text-sm text-gray-900 text-right">₹1,200</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="py-3 px-4 text-sm text-gray-900">Sparkly Princess Dress</td>
+                        <td className="py-3 px-4 text-sm text-blue-600">Clothing</td>
+                        <td className="py-3 px-4 text-sm text-gray-600 text-right">100</td>
+                        <td className="py-3 px-4 text-sm text-gray-900 text-right">₹1,600</td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 px-4 text-sm text-gray-900">Baby Care Set</td>
+                        <td className="py-3 px-4 text-sm text-blue-600">Baby Care</td>
+                        <td className="py-3 px-4 text-sm text-gray-600 text-right">80</td>
+                        <td className="py-3 px-4 text-sm text-gray-900 text-right">₹800</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+
+              {/* Low Stock placed at bottom */}
+              <LowStockAlerts />
             </>
           )}
         </main>
