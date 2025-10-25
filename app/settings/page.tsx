@@ -20,6 +20,7 @@ export default function SettingsIndexPage() {
         <li><Link href="/settings/categories" className="underline">Category Management</Link> <span className="text-muted-foreground">(admin)</span></li>
         <li><Link href="/settings/inventory-logs" className="underline">Inventory Logs</Link> <span className="text-muted-foreground">(admin)</span></li>
         <li><Link href="/settings/offers" className="underline">Offers</Link> <span className="text-muted-foreground">(admin)</span></li>
+        <li><Link href="/settings/offline-queue" className="underline">Offline Queue</Link> <span className="text-muted-foreground">(admin)</span></li>
       </ul>
     </div>
   );

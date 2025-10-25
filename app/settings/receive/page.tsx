@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { decodeBarcode } from "@/lib/barcodes";
 import { findProductBySKU } from "@/lib/products";
+import { findCachedBySKU } from "@/lib/catalog-cache";
+import { enqueueOp } from "@/lib/offline";
 import { receiveStock } from "@/lib/pos";
 import { useToast } from "@/components/ui/toast";
 
@@ -101,7 +103,13 @@ export default function ReceiveStockPage() {
   async function processScanValue(raw: string) {
     const decoded = decodeBarcode(raw);
     const sku = decoded?.sku || raw;
-    const prod = await findProductBySKU(sku);
+    let prod = await findProductBySKU(sku);
+    if (!prod && !navigator.onLine) {
+      const cached = await findCachedBySKU(sku);
+      if (cached) {
+        prod = { id: cached.id, name: cached.name, sku: cached.sku, unitPrice: cached.unitPrice, active: true, stock: 0, createdAt: '', updatedAt: '' } as any;
+      }
+    }
     if (!prod) {
       toast({ title: 'Scan failed', description: `SKU not found: ${sku}`, variant: 'destructive' });
       return;
@@ -132,15 +140,22 @@ export default function ReceiveStockPage() {
     if (lines.length === 0) return;
     setBusy(true);
     try {
-      const rid = await receiveStock({
+      const payload = {
         createdByUserId: user!.uid,
         supplierName: supplierName || undefined,
         docNo: docNo || undefined,
         docDate: docDate ? new Date(docDate).toISOString() : undefined,
         note: note || undefined,
         lines: lines.map(l => ({ productId: l.productId, sku: l.sku, name: l.name, qty: l.qty, unitCost: l.unitCost })),
-      });
-      toast({ title: 'Stock received', description: `Receipt ${rid}`, variant: 'success' });
+      };
+      if (!navigator.onLine) {
+        const id = `op-rec-${Date.now()}`;
+        await enqueueOp({ id, type: 'receive', payload, createdAt: new Date().toISOString(), attempts: 0 });
+        toast({ title: 'Queued offline', description: 'Receipt will sync when connected', variant: 'success' });
+      } else {
+        const rid = await receiveStock(payload);
+        toast({ title: 'Stock received', description: `Receipt ${rid}`, variant: 'success' });
+      }
       setLines([]);
       setNote("");
       setSupplierName("");
