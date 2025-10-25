@@ -108,17 +108,39 @@ export default function ExchangePage() {
     try {
       // Choose methods based on rough difference sign from client subtotal; server will compute exact
       const diffRough = newSubtotal - 0; // return credit unknown here
-      const res = await performExchange({
-        originalInvoiceId: inv.id!,
-        returned,
-        newItems: newLines.map(n => ({ productId: n.productId, qty: n.qty })),
-        cashierUserId: user.uid,
-        cashierName: user.displayName || undefined,
-        paymentMethod: diffRough > 0 ? 'cash' : undefined,
-        refundMethod: diffRough < 0 ? 'cash' : undefined,
-      });
-      toast({ title: 'Exchange completed', description: res.newInvoiceId ? `Invoice ${res.newInvoiceId}` : (res.refundId ? `Refund ${res.refundId}` : ''), variant: 'success' });
-      router.push(`/invoices/${res.newInvoiceId || inv.id}`);
+      if (!navigator.onLine) {
+        try {
+          const id = `op-ex-${Date.now()}`;
+          const payload = {
+            originalInvoiceId: inv.id!,
+            returned,
+            newItems: newLines.map(n => ({ productId: n.productId, qty: n.qty })),
+            cashierUserId: user.uid,
+            cashierName: user.displayName || undefined,
+            paymentMethod: diffRough > 0 ? 'cash' : undefined,
+            refundMethod: diffRough < 0 ? 'cash' : undefined,
+            opId: id,
+          };
+          await (await import("@/lib/offline")).enqueueOp({ id, type: 'exchange', payload, createdAt: new Date().toISOString(), attempts: 0 });
+          toast({ title: 'Exchange queued', description: 'Offline: exchange will sync when connected', variant: 'success' });
+          router.push(`/invoices/${inv.id}`);
+        } catch (e) {
+          toast({ title: 'Queue failed', description: 'Could not enqueue exchange', variant: 'destructive' });
+        }
+      } else {
+        const res = await performExchange({
+          originalInvoiceId: inv.id!,
+          returned,
+          newItems: newLines.map(n => ({ productId: n.productId, qty: n.qty })),
+          cashierUserId: user.uid,
+          cashierName: user.displayName || undefined,
+          paymentMethod: diffRough > 0 ? 'cash' : undefined,
+          refundMethod: diffRough < 0 ? 'cash' : undefined,
+          opId: `op-ex-${Date.now()}`,
+        });
+        toast({ title: 'Exchange completed', description: res.newInvoiceId ? `Invoice ${res.newInvoiceId}` : (res.refundId ? `Refund ${res.refundId}` : ''), variant: 'success' });
+        router.push(`/invoices/${res.newInvoiceId || inv.id}`);
+      }
     } catch (e) {
       toast({ title: 'Exchange failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
     } finally { setBusy(false); }
