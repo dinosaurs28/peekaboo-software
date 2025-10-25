@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { ProductDoc } from "@/lib/models";
 import { decodeBarcode } from "@/lib/barcodes";
 import { findProductBySKU, listProducts } from "@/lib/products";
+import { saveProductsToCache, getCachedProducts, findCachedBySKU } from "@/lib/catalog-cache";
 import { checkoutCart } from "@/lib/pos";
 import { listActiveOffers } from "@/lib/offers";
 import type { OfferDoc, ProductDoc as P } from "@/lib/models";
@@ -46,8 +47,23 @@ export function PosPanel() {
   }, []);
 
   useEffect(() => {
-    // Load catalog for name search/manual add fallback
-    listProducts().then(setAllProducts).catch(() => undefined);
+    async function load() {
+      try {
+        if (navigator.onLine) {
+          const list = await listProducts();
+          setAllProducts(list);
+          // Save to offline cache
+          saveProductsToCache(list).catch(() => undefined);
+        } else {
+          const cached = await getCachedProducts();
+          setAllProducts(cached as any);
+        }
+      } catch {
+        // fallback to cache if network failed
+        try { const cached = await getCachedProducts(); setAllProducts(cached as any); } catch { }
+      }
+    }
+    load();
   }, []);
 
   useEffect(() => {
@@ -339,7 +355,13 @@ export function PosPanel() {
     }
 
     const sku = decoded.sku;
-    const product = await findProductBySKU(sku);
+    let product = await findProductBySKU(sku);
+    if (!product && !navigator.onLine) {
+      const cached = await findCachedBySKU(sku);
+      if (cached) {
+        product = { id: cached.id, name: cached.name, sku: cached.sku, unitPrice: cached.unitPrice, category: cached.category, taxRatePct: cached.taxRatePct, active: true, stock: 0, createdAt: '', updatedAt: '' } as any;
+      }
+    }
     if (!product) {
       showToast('error', `No product found for SKU ${sku}`);
       setScanValue("");
@@ -494,23 +516,47 @@ export function PosPanel() {
           customerId = newId;
         }
       }
-      await checkoutCart({
-        lines: cart.map((l) => ({
-          productId: l.product.id!,
-          name: l.product.name,
-          qty: l.qty,
-          unitPrice: l.product.unitPrice,
-          lineDiscount: lineDiscount(l),
-          // pass tax rate if present for GST calc
-          taxRatePct: l.product.taxRatePct,
-        }) as any),
-        billDiscount: billDiscComputed,
-        paymentMethod,
-        paymentReferenceId: paymentRef || undefined,
-        cashierUserId: user?.uid,
-        cashierName: user?.displayName || user?.email || 'Cashier',
-        customerId,
-      });
+      if (!navigator.onLine) {
+        // enqueue the checkout for later sync
+        try {
+          const id = `op-${Date.now()}`;
+          const payload = {
+            lines: cart.map((l) => ({ productId: l.product.id!, name: l.product.name, qty: l.qty, unitPrice: l.product.unitPrice, lineDiscount: lineDiscount(l), taxRatePct: l.product.taxRatePct })),
+            billDiscount: billDiscComputed,
+            paymentMethod,
+            paymentReferenceId: paymentRef || undefined,
+            cashierUserId: user?.uid,
+            cashierName: user?.displayName || user?.email || 'Cashier',
+            customerId,
+            opId: id,
+          };
+          await (await import("@/lib/offline")).enqueueOp({ id, type: 'checkout', payload, createdAt: new Date().toISOString(), attempts: 0 });
+          showToast('success', 'Offline: checkout queued. It will sync when connection is restored.');
+        } catch (e) {
+          showToast('error', 'Failed to queue checkout for offline use');
+          console.error(e);
+          return;
+        }
+      } else {
+        await checkoutCart({
+          lines: cart.map((l) => ({
+            productId: l.product.id!,
+            name: l.product.name,
+            qty: l.qty,
+            unitPrice: l.product.unitPrice,
+            lineDiscount: lineDiscount(l),
+            // pass tax rate if present for GST calc
+            taxRatePct: l.product.taxRatePct,
+          }) as any),
+          billDiscount: billDiscComputed,
+          paymentMethod,
+          paymentReferenceId: paymentRef || undefined,
+          cashierUserId: user?.uid,
+          cashierName: user?.displayName || user?.email || 'Cashier',
+          customerId,
+          opId: `op-${Date.now()}`,
+        });
+      }
       showToast('success', 'Checkout complete. Invoice saved.');
       setCart([]);
       setSelectedIndex(-1);
