@@ -135,6 +135,8 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
     tx.set(invRef, {
       ...inv,
       ...(input.customerId ? { customerId: input.customerId } : {}),
+      // Idempotency: allow external callers to set opId to avoid duplicates on replay
+      ...(typeof (input as any).opId === 'string' ? { opId: (input as any).opId } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
