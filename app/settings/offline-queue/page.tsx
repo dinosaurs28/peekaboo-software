@@ -25,7 +25,19 @@ export default function OfflineQueuePage() {
   useEffect(() => { refresh(); }, []);
 
   if (loading) return <div className="p-6">Loading…</div>;
-  if (!user || role !== 'admin') return <div className="p-6 text-sm text-muted-foreground">Admin access required.</div>;
+  if (!user || role !== 'admin') {
+    return (
+      <div className="p-6 space-y-3">
+        {!user ? (
+          <div className="inline-flex items-center gap-2 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-1 text-xs">
+            <span className="w-2 h-2 rounded-full bg-yellow-500" />
+            Waiting for sign-in — queue processing is paused
+          </div>
+        ) : null}
+        <div className="text-sm text-muted-foreground">Admin access required.</div>
+      </div>
+    );
+  }
 
   async function onRetry(id: string) {
     setBusy(true);
@@ -62,9 +74,14 @@ export default function OfflineQueuePage() {
         <div />
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center flex-wrap">
         <button className="h-9 px-3 rounded-md border text-sm" onClick={refresh} disabled={busy}>Refresh</button>
         <button className="h-9 px-3 rounded-md border text-sm" onClick={onRetryAll} disabled={busy || items.length === 0}>Process Queue</button>
+        {/* Auth badge for clarity */}
+        <div className="ml-auto inline-flex items-center gap-2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1 text-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          Signed in as {user.email || user.uid}
+        </div>
       </div>
 
       <div className="text-sm text-muted-foreground">Pending: {items.length} · Failed: {failed.length}</div>
