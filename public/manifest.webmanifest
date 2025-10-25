@@ -1,0 +1,10 @@
+{
+  "name": "Peekaboo POS",
+  "short_name": "Peekaboo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "description": "POS with inventory, billing, and offline resilience.",
+  "icons": []
+}
