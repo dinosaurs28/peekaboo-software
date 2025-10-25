@@ -117,7 +117,8 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
       payment: difference > 0 ? (req.paymentMethod ? { type: 'pay', method: req.paymentMethod, referenceId: req.paymentReferenceId } : undefined) : (difference < 0 ? (req.refundMethod ? { type: 'refund', method: req.refundMethod, referenceId: req.refundReferenceId } : undefined) : undefined),
       createdByUserId: req.cashierUserId,
     } as any;
-    tx.set(exRef, { ...exchangePayload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  // Idempotency: pass through optional opId in request to allow duplicate guard later
+  tx.set(exRef, { ...exchangePayload, ...(req as any).opId ? { opId: (req as any).opId } : {}, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
 
     let createdInvoiceId: string | undefined;
     let createdRefundId: string | undefined;
@@ -167,7 +168,7 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
         exchangeId: exRef.id,
     ...(inv.customerId ? { customerId: inv.customerId } : {}),
       } as any;
-      (tx as any).set(invRef, { ...invDoc, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  (tx as any).set(invRef, { ...invDoc, ...(req as any).opId ? { opId: (req as any).opId } : {}, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       createdInvoiceId = invRef.id;
 
       // Decrement stock for new items and write logs
