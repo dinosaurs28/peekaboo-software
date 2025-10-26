@@ -40,6 +40,10 @@ export function PosPanel() {
   const [custKidsDob, setCustKidsDob] = useState("");
   const [custFound, setCustFound] = useState<{ id: string; name: string; points?: number } | null>(null);
   const [custChecking, setCustChecking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // UI-only: GST fields (no backend changes)
+  const [gstin, setGstin] = useState("");
+  const [placeOfSupply, setPlaceOfSupply] = useState("");
 
   // Focus the input to capture scanner entries
   useEffect(() => {
@@ -66,8 +70,8 @@ export function PosPanel() {
     load();
   }, []);
 
+  // Load active offers for cashier visibility
   useEffect(() => {
-    // Load active offers for cashier visibility
     listActiveOffers().then(setOffers).catch(() => undefined);
   }, []);
 
@@ -498,6 +502,7 @@ export function PosPanel() {
 
   async function onCheckout() {
     if (cart.length === 0) return;
+    setBusy(true);
     try {
       // Resolve customerId by phone
       let customerId: string | undefined = undefined;
@@ -572,6 +577,8 @@ export function PosPanel() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       showToast('error', `Checkout failed: ${msg}`);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -643,64 +650,72 @@ export function PosPanel() {
   }, [bestOffer?.id]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="lg:col-span-2 space-y-4">
-        <form onSubmit={handleScanSubmit} className="flex flex-wrap gap-2 items-center relative">
-          <Input
-            ref={inputRef}
-            value={scanValue}
-            onChange={(e) => setScanValue(e.target.value)}
-            placeholder="Scan barcode here..."
-            autoComplete="off"
-          />
-          <Button type="submit">Add</Button>
-          <div className="flex items-center gap-2 ml-auto">
-            <label className="text-sm text-muted-foreground">Bill discount</label>
-            <select className="h-9 rounded-md border bg-background px-2 text-sm" value={billDiscountMode} onChange={(e) => setBillDiscountMode(e.target.value as 'amount' | 'percent')}>
-              <option value="amount">₹ Amount</option>
-              <option value="percent">% Percentage</option>
-            </select>
-            <Input type="number" placeholder="0" value={billDiscount === 0 ? "" : billDiscount}
-              onChange={(e) => setBillDiscount(Number(e.target.value || 0))} className="w-28" />
-          </div>
-        </form>
-        {error && <div className="text-sm text-red-600">{error}</div>}
-        <div className="relative">
-          <Input
-            placeholder="Search by name or SKU…"
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setSearchOpen(true); }}
-            onFocus={() => setSearchOpen(true)}
-            onBlur={() => setTimeout(() => setSearchOpen(false), 120)}
-          />
-          {searchOpen && filtered.length > 0 && (
-            <DropdownPanel className="absolute z-10 mt-1 w-full max-h-64 overflow-auto">
-              {filtered.map((p) => (
-                <button key={p.id} className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
-                  onClick={() => { addByProductId(p.id); setSearchTerm(""); setSearchOpen(false); inputRef.current?.focus(); }}>
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-xs text-muted-foreground">{p.sku} • ₹{p.unitPrice.toFixed(2)}</div>
-                </button>
-              ))}
-            </DropdownPanel>
-          )}
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Point of Sale</h1>
         </div>
-        <div className="border rounded-md overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left">
+
+        {/* Search Box */}
+        <div className="bg-white rounded-lg p-1 shadow-sm">
+          <form onSubmit={handleScanSubmit} className="relative">
+            <div className="flex items-center gap-2 px-3">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <Input
+                ref={inputRef}
+                value={scanValue}
+                onChange={(e) => {
+                  setScanValue(e.target.value);
+                  setSearchTerm(e.target.value);
+                  setSearchOpen(e.target.value.trim().length > 0);
+                }}
+                placeholder="Search for products"
+                autoComplete="off"
+                className="border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-600 placeholder:text-gray-400"
+              />
+            </div>
+            {/* Dropdown for search results */}
+            {searchOpen && filtered.length > 0 && (
+              <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-auto">
+                {filtered.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                    onClick={() => { addByProductId(p.id); setScanValue(""); setSearchTerm(""); setSearchOpen(false); inputRef.current?.focus(); }}
+                  >
+                    <div className="font-medium text-gray-900">{p.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">SKU: {p.sku} • ₹{p.unitPrice.toFixed(2)}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </form>
+        </div>
+
+        {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
+
+        {/* Cart Table */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-3 py-2">Item</th>
-                <th className="px-3 py-2">Price</th>
-                <th className="px-3 py-2">Qty</th>
-                <th className="px-3 py-2">Item Disc.</th>
-                <th className="px-3 py-2">Line Total</th>
-                <th className="px-3 py-2">Actions</th>
+                <th className="px-4 py-4 text-left text-sm font-medium text-gray-500">Product Name</th>
+                <th className="px-4 py-4 text-left text-sm font-medium text-gray-500">Quantity</th>
+                <th className="px-4 py-4 text-left text-sm font-medium text-gray-500">Price</th>
+                <th className="px-4 py-4 text-left text-sm font-medium text-gray-500">Discount</th>
+                <th className="px-4 py-4 text-right text-sm font-medium text-gray-500">Total</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {cart.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-4 text-muted-foreground" colSpan={6}>Scan or search items to add to the bill</td>
+                  <td className="px-4 py-12 text-center text-gray-400" colSpan={5}>
+                    <div className="text-base">Cart is empty. Search or scan products to add</div>
+                  </td>
                 </tr>
               ) : (
                 cart.map((l, idx) => (
@@ -708,107 +723,269 @@ export function PosPanel() {
                     key={l.product.id}
                     ref={(el) => { rowRefs.current[idx] = el; }}
                     onClick={() => setSelectedIndex(idx)}
-                    className={`border-t cursor-pointer ${idx === selectedIndex ? 'bg-muted/40 outline-1 outline-primary/50' : ''}`}
+                    className={`cursor-pointer transition-colors ${idx === selectedIndex ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                   >
-                    <td className="px-3 py-2">{l.product.name}<div className="text-xs text-muted-foreground">{l.product.sku}</div></td>
-                    <td className="px-3 py-2">₹{l.product.unitPrice.toFixed(2)}</td>
-                    <td className="px-3 py-2">
-                      <Input type="number" className="w-20" placeholder="1" value={l.qty === 1 ? "" : l.qty}
-                        onChange={(e) => setQty(l.product.id, Number(e.target.value || 1))} />
+                    <td className="px-4 py-4">
+                      <div className="font-medium text-gray-900">{l.product.name}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">SKU: {l.product.sku}</div>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
-                        <select className="h-9 rounded-md border bg-background px-2 text-sm" value={l.itemDiscountMode ?? 'amount'} onChange={(e) => setItemDiscountMode(l.product.id, e.target.value as 'amount' | 'percent')}>
-                          <option value="amount">₹ Amount</option>
-                          <option value="percent">% Percentage</option>
-                        </select>
-                        <Input type="number" className="w-24" placeholder="0" value={(l.itemDiscount ?? 0) === 0 ? "" : l.itemDiscount}
-                          onChange={(e) => setItemDiscount(l.product.id, Number(e.target.value || 0))} />
+                        <button
+                          className="w-8 h-8 rounded border border-gray-300 hover:bg-gray-100 text-gray-600 font-medium text-lg"
+                          onClick={(e) => { e.stopPropagation(); decrement(l.product.id); }}
+                        >−</button>
+                        <span className="text-blue-600 font-semibold w-8 text-center">{l.qty}</span>
+                        <button
+                          className="w-8 h-8 rounded border border-gray-300 hover:bg-gray-100 text-gray-600 font-medium text-lg"
+                          onClick={(e) => { e.stopPropagation(); increment(l.product.id); }}
+                        >+</button>
+                        <button
+                          className="ml-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded border border-red-200"
+                          onClick={(e) => { e.stopPropagation(); removeLine(l.product.id); }}
+                        >Remove</button>
                       </div>
                     </td>
-                    <td className="px-3 py-2">₹{(l.product.unitPrice * l.qty - lineDiscount(l)).toFixed(2)}</td>
-                    <td className="px-3 py-2 flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => increment(l.product.id)}>+</Button>
-                      <Button size="sm" variant="outline" onClick={() => decrement(l.product.id)}>-</Button>
-                      <Button size="sm" variant="destructive" onClick={() => removeLine(l.product.id)}>Remove</Button>
+                    <td className="px-4 py-4 text-blue-600 font-medium">₹{l.product.unitPrice.toFixed(2)}</td>
+                    {/* New Discount column */}
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="h-8 rounded border border-gray-300 bg-white px-2 text-xs"
+                          value={l.itemDiscountMode ?? 'amount'}
+                          onChange={(e) => setItemDiscountMode(l.product.id, e.target.value as 'amount' | 'percent')}
+                        >
+                          <option value="amount">₹</option>
+                          <option value="percent">%</option>
+                        </select>
+                        <Input
+                          type="number"
+                          className="w-20 h-8"
+                          placeholder="0"
+                          value={(l.itemDiscount ?? 0) === 0 ? "" : l.itemDiscount}
+                          onChange={(e) => setItemDiscount(l.product.id, Number(e.target.value || 0))}
+                        />
+                        {/* Removed inline deducted amount display per request */}
+                      </div>
                     </td>
+                    <td className="px-4 py-4 text-right text-blue-600 font-semibold">₹{(l.product.unitPrice * l.qty - lineDiscount(l)).toFixed(2)}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
-      </div>
-      <div className="space-y-4">
-        <div className="border rounded-md p-4 space-y-3">
-          <div className="text-sm font-medium">Customer</div>
-          <div className="flex items-center gap-2">
-            <Input placeholder="Phone number" value={custPhone} onChange={(e) => setCustPhone(e.target.value)} onBlur={lookupCustomerByPhone} className="flex-1" />
-            <Button type="button" variant="outline" onClick={lookupCustomerByPhone} disabled={custChecking}>{custChecking ? 'Checking…' : 'Check'}</Button>
-          </div>
-          {custFound ? (
-            <div className="text-xs text-muted-foreground">Existing customer: <span className="font-medium">{custFound.name}</span>{typeof custFound.points === 'number' ? <span className="ml-2">• Points: <span className="font-medium">{custFound.points}</span></span> : null}</div>
-          ) : (
-            <div className="space-y-2">
-              <Input placeholder="Customer name" value={custName} onChange={(e) => setCustName(e.target.value)} />
-              <Input placeholder="Email (optional)" value={custEmail} onChange={(e) => setCustEmail(e.target.value)} />
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground">Kid&apos;s DOB</label>
-                <Input type="date" value={custKidsDob} onChange={(e) => setCustKidsDob(e.target.value)} className="w-48" />
+
+        {/* Advanced Options - Collapsible */}
+        {cart.length > 0 && (
+          <details className="bg-white rounded-lg shadow-sm p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-gray-700 select-none">
+              Advanced Options (Bill Discount, GST, Customer, Offers)
+            </summary>
+            <div className="mt-4 space-y-4 border-t pt-4">
+              {/* Bill Discount */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Bill-Level Discount</h3>
+                <div className="flex items-center gap-3">
+                  <select
+                    className="h-9 rounded border border-gray-300 bg-white px-3 text-sm"
+                    value={billDiscountMode}
+                    onChange={(e) => setBillDiscountMode(e.target.value as 'amount' | 'percent')}
+                  >
+                    <option value="amount">₹ Amount</option>
+                    <option value="percent">% Percentage</option>
+                  </select>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={billDiscount === 0 ? "" : billDiscount}
+                    onChange={(e) => setBillDiscount(Number(e.target.value || 0))}
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+
+              {/* GST Info */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">GST Info</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Input
+                    placeholder="Customer GSTIN (optional)"
+                    value={gstin}
+                    onChange={(e) => setGstin(e.target.value)}
+                  />
+                  <Input
+                    placeholder="Place of Supply (e.g., TN)"
+                    value={placeOfSupply}
+                    onChange={(e) => setPlaceOfSupply(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Customer */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Customer Details</h3>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Phone number"
+                      value={custPhone}
+                      onChange={(e) => setCustPhone(e.target.value)}
+                      onBlur={lookupCustomerByPhone}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={lookupCustomerByPhone}
+                      disabled={custChecking}
+                      className="h-9"
+                    >
+                      {custChecking ? 'Checking…' : 'Lookup'}
+                    </Button>
+                  </div>
+                  {custFound ? (
+                    <div className="text-xs text-gray-600 bg-emerald-50 border border-emerald-200 rounded px-3 py-2">
+                      <div className="font-medium text-gray-900">{custFound.name}</div>
+                      {typeof custFound.points === 'number' && (
+                        <div className="mt-1">Loyalty Points: <span className="font-semibold text-emerald-700">{custFound.points}</span></div>
+                      )}
+                    </div>
+                  ) : custPhone ? (
+                    <div className="space-y-2">
+                      <Input placeholder="Customer name" value={custName} onChange={(e) => setCustName(e.target.value)} />
+                      <Input placeholder="Email (optional)" value={custEmail} onChange={(e) => setCustEmail(e.target.value)} />
+                      <Input type="date" placeholder="Kid's DOB" value={custKidsDob} onChange={(e) => setCustKidsDob(e.target.value)} />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Offers */}
+              {offers.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Active Offers</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {offers.map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => applyOffer(o.id!)}
+                        className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${offerAppliedId === o.id
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                          }`}
+                      >
+                        {o.name}
+                      </button>
+                    ))}
+                  </div>
+                  {bestOffer && (
+                    <div className="text-xs text-gray-600 mt-2">
+                      Suggested:{' '}
+                      <button className="underline text-blue-600" onClick={() => applyOffer(bestOffer.id!)}>
+                        {bestOffer.name}
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="text-xs underline text-gray-500 hover:text-gray-700 mt-2"
+                    onClick={clearOfferAdjustments}
+                  >
+                    Clear all adjustments
+                  </button>
+                </div>
+              )}
+            </div>
+          </details>
+        )}
+
+        {/* Grand Total Summary */}
+        {cart.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1 text-sm text-gray-600">
+                <div>Subtotal</div>
+                <div>Bill Discount</div>
+              </div>
+              <div className="text-right space-y-1">
+                <div className="text-sm font-medium text-gray-900">₹{subTotal.toFixed(2)}</div>
+                <div className="text-sm font-medium text-gray-900">−₹{billDiscComputed.toFixed(2)}</div>
               </div>
             </div>
-          )}
-        </div>
-        <div className="border rounded-md p-4">
-          <div className="text-sm text-muted-foreground">Subtotal</div>
-          <div className="text-xl font-semibold">₹{subTotal.toFixed(2)}</div>
-        </div>
-        {offers.length > 0 && (
-          <div className="border rounded-md p-4 space-y-2">
-            <div className="text-sm font-medium">Active Offers</div>
-            <div className="flex flex-wrap gap-2">
-              {offers.map(o => (
-                <button key={o.id} type="button" onClick={() => applyOffer(o.id!)} className={`px-2 py-1 rounded-md border text-sm ${offerAppliedId === o.id ? 'bg-emerald-600 text-white' : 'bg-background'}`}>{o.name}</button>
-              ))}
+            <div className="border-t mt-4 pt-4 flex items-center justify-between">
+              <div className="text-lg font-semibold text-gray-900">Grand Total</div>
+              <div className="text-2xl font-bold text-gray-900">₹{total.toFixed(2)}</div>
             </div>
-            {bestOffer && <div className="text-xs text-muted-foreground">Suggested: <button className="underline" onClick={() => applyOffer(bestOffer.id!)}>{bestOffer.name}</button></div>}
-            <button type="button" className="text-xs underline text-muted-foreground" onClick={clearOfferAdjustments}>Clear offer adjustments</button>
           </div>
         )}
-        <div className="border rounded-md p-4">
-          <div className="text-sm text-muted-foreground">Bill discount</div>
-          <div className="flex items-center gap-2">
-            <select className="h-9 rounded-md border bg-background px-2 text-sm" value={billDiscountMode} onChange={(e) => setBillDiscountMode(e.target.value as 'amount' | 'percent')}>
-              <option value="amount">₹ Amount</option>
-              <option value="percent">% Percentage</option>
-            </select>
-            <Input type="number" placeholder="0" value={billDiscount === 0 ? "" : billDiscount}
-              onChange={(e) => setBillDiscount(Number(e.target.value || 0))} />
+
+        {/* Payment Options */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-4">Payment Options</h2>
+          <div className="flex gap-3 mb-4">
+            {(['cash', 'card', 'upi'] as const).map((method) => (
+              <button
+                key={method}
+                type="button"
+                onClick={() => setPaymentMethod(method)}
+                className={`flex-1 py-3 rounded-lg font-medium text-sm transition-colors ${paymentMethod === method
+                    ? 'bg-gray-200 text-gray-900'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+              >
+                {method.charAt(0).toUpperCase() + method.slice(1)}
+              </button>
+            ))}
           </div>
+          {(paymentMethod === 'card' || paymentMethod === 'upi') && (
+            <Input
+              placeholder="Payment Reference / Transaction ID (optional)"
+              value={paymentRef}
+              onChange={(e) => setPaymentRef(e.target.value)}
+              className="mb-6"
+            />
+          )}
+
+          {/* Complete Sale Button */}
+          <button
+            onClick={onCheckout}
+            disabled={cart.length === 0 || busy}
+            className="w-full py-4 bg-cyan-400 hover:bg-cyan-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-gray-900 font-semibold rounded-lg text-lg transition-colors"
+          >
+            {busy ? 'Processing...' : 'Complete Sale'}
+          </button>
+
+          {/* Clear Draft */}
+          <button
+            onClick={() => {
+              setCart([]);
+              setBillDiscount(0);
+              setPaymentRef('');
+              setCustPhone('');
+              setCustName('');
+              setCustEmail('');
+              setCustKidsDob('');
+              try {
+                localStorage.removeItem(DRAFT_KEY_V2);
+                localStorage.removeItem(DRAFT_KEY_V1);
+              } catch { }
+              showToast('success', 'Cart cleared');
+            }}
+            disabled={cart.length === 0}
+            className="w-full mt-3 py-2 text-sm text-gray-600 hover:text-gray-900 disabled:text-gray-400"
+          >
+            Clear Cart
+          </button>
         </div>
-        <div className="border rounded-md p-4">
-          <div className="text-sm text-muted-foreground">Grand Total</div>
-          <div className="text-2xl font-semibold">₹{total.toFixed(2)}</div>
-        </div>
-        <div className="border rounded-md p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground">Payment</label>
-            <select className="h-9 rounded-md border bg-background px-2 text-sm" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'cash' | 'card' | 'upi' | 'wallet')}>
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="upi">UPI</option>
-              <option value="wallet">Wallet</option>
-            </select>
-          </div>
-          <Input placeholder="Reference / Txn ID (optional)" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} />
-          {/* Split payments removed */}
-        </div>
-        <div className="flex gap-2">
-          <Button className="flex-1" variant="outline" disabled={cart.length === 0} onClick={() => { setCart([]); setBillDiscount(0); setPaymentRef(""); setCustPhone(""); setCustName(""); setCustEmail(""); setCustKidsDob(""); try { localStorage.removeItem(DRAFT_KEY_V2); localStorage.removeItem(DRAFT_KEY_V1); } catch { }; showToast('success', 'Draft cleared'); }}>Clear Draft</Button>
-          <Button className="flex-1" disabled={cart.length === 0} onClick={onCheckout}>Confirm Payment & Checkout</Button>
-        </div>
+
+        {/* Toast */}
         {toast && (
-          <div className={`fixed bottom-4 right-4 rounded-md px-4 py-3 shadow-lg border text-sm ${toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
+          <div
+            className={`fixed bottom-4 right-4 rounded-lg px-4 py-3 shadow-xl text-sm font-medium ${toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'
+              }`}
+          >
             {toast.message}
           </div>
         )}
