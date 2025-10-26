@@ -9,7 +9,7 @@ import { DollarSign, Users, Wallet } from "lucide-react";
 import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";
 import { PosPanel } from "@/components/pos/pos-panel";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, orderBy, query, where, Timestamp, type DocumentData, type QuerySnapshot, type QueryConstraint } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, where, getDocs, Timestamp, type DocumentData, type QuerySnapshot, type QueryConstraint } from "firebase/firestore";
 import { COLLECTIONS } from "@/lib/models";
 import { listProducts } from "@/lib/products";
 import { Card } from "@/components/ui/card";
@@ -36,6 +36,8 @@ export default function DashboardPage() {
   const [costMap, setCostMap] = useState<Record<string, number>>({});
   const [productMeta, setProductMeta] = useState<Record<string, { name: string; category?: string }>>({});
   const [topItems, setTopItems] = useState<Array<{ productId: string; name: string; category?: string; units: number; revenue: number }>>([]);
+  const [revenueBuckets, setRevenueBuckets] = useState<Array<{ label: string; total: number }>>([]);
+  const [prevRevenue, setPrevRevenue] = useState(0);
 
   // Compute ISO bounds based on selected dates
   const fromIso = useMemo(() => {
@@ -50,6 +52,12 @@ export default function DashboardPage() {
     d.setHours(23, 59, 59, 999);
     return d.toISOString();
   }, [toDate]);
+  const rangeDays = useMemo(() => {
+    if (!fromDate || !toDate) return 0;
+    const a = new Date(`${fromDate}T00:00:00.000Z`).getTime();
+    const b = new Date(`${toDate}T23:59:59.999Z`).getTime();
+    return Math.max(1, Math.round((b - a) / 86400000));
+  }, [fromDate, toDate]);
   const customersFromTs = useMemo(() => (fromDate ? Timestamp.fromDate(new Date(`${fromDate}T00:00:00.000Z`)) : undefined), [fromDate]);
   const customersToTs = useMemo(() => (toDate ? Timestamp.fromDate(new Date(`${toDate}T23:59:59.999Z`)) : undefined), [toDate]);
 
@@ -88,12 +96,17 @@ export default function DashboardPage() {
       let rev = 0;
       let exp = 0;
       const agg = new Map<string, { productId: string; name: string; category?: string; units: number; revenue: number }>();
+      const dayMap = new Map<string, number>();
       snap.docs.forEach((d) => {
         const data = d.data() as Record<string, unknown>;
         const grand = typeof data.grandTotal === 'number' ? data.grandTotal : Number(data.grandTotal ?? 0);
         rev += Number.isFinite(grand) ? grand : 0;
         // Approximate expenses (COGS) by summing product costPrice * quantity
         const items = Array.isArray(data.items) ? data.items as Array<Record<string, unknown>> : [];
+        // Bucket by day for simple bar chart
+        const issuedAt = typeof data.issuedAt === 'string' ? data.issuedAt : undefined;
+        const dayKey = issuedAt ? issuedAt.slice(0, 10) : undefined;
+        if (dayKey) dayMap.set(dayKey, (dayMap.get(dayKey) || 0) + (Number.isFinite(grand) ? grand : 0));
         items.forEach((it) => {
           const pid = String(it.productId ?? "");
           const qty = typeof it.quantity === 'number' ? it.quantity : Number(it.quantity ?? 0);
@@ -121,9 +134,37 @@ export default function DashboardPage() {
       setExpenses(exp);
       const list = Array.from(agg.values()).sort((a, b) => (b.units - a.units) || (b.revenue - a.revenue));
       setTopItems(list);
+      // Prepare buckets (limit to last 12 buckets)
+      const buckets = Array.from(dayMap.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([k, v]) => ({ label: k, total: v }));
+      const limited = buckets.length > 12 ? buckets.slice(buckets.length - 12) : buckets;
+      setRevenueBuckets(limited);
     });
     return () => unsub();
   }, [fromIso, toIso, costMap, productMeta]);
+
+  // Previous period revenue for percentage change
+  useEffect(() => {
+    if (!db || !fromIso || !toIso) { setPrevRevenue(0); return; }
+    const curStart = new Date(fromIso).getTime();
+    const curEnd = new Date(toIso).getTime();
+    const duration = curEnd - curStart + 1;
+    const prevStart = new Date(curStart - duration);
+    const prevEnd = new Date(curStart - 1);
+    const prevFromIso = prevStart.toISOString();
+    const prevToIso = prevEnd.toISOString();
+    const col = collection(db, COLLECTIONS.invoices);
+    const q = query(col, where("issuedAt", ">=", prevFromIso), where("issuedAt", "<=", prevToIso), orderBy("issuedAt", "desc"));
+    getDocs(q).then((snap) => {
+      let prev = 0;
+      snap.docs.forEach((d) => {
+        const data = d.data() as Record<string, unknown>;
+        const grand = typeof data.grandTotal === 'number' ? data.grandTotal : Number(data.grandTotal ?? 0);
+        prev += Number.isFinite(grand) ? grand : 0;
+      });
+      setPrevRevenue(prev);
+    }).catch(() => setPrevRevenue(0));
+  }, [fromIso, toIso]);
 
   // New customers in selected range by createdAt timestamp
   useEffect(() => {
@@ -218,24 +259,28 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-sm text-gray-500">Revenue Over Time</p>
                     <p className="text-3xl font-bold text-gray-900 mt-1">₹{revenue.toLocaleString()}</p>
-                    <p className="text-sm text-emerald-600 mt-1">Last 30 Days +12%</p>
+                    {(() => {
+                      const pct = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : (revenue > 0 ? 100 : 0);
+                      const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+                      const label = rangeDays > 1 ? `Last ${rangeDays} Days` : 'Vs previous day';
+                      const cls = pct > 0 ? 'text-emerald-600' : pct < 0 ? 'text-rose-600' : 'text-gray-500';
+                      return <p className={`text-sm mt-1 ${cls}`}>{label} {pctStr}</p>;
+                    })()}
                   </div>
 
-                  {/* Placeholder for chart - will show simple visualization */}
-                  <div className="h-48 flex items-end justify-between gap-2 border-b border-gray-200 pb-2">
-                    <div className="flex-1 h-24 bg-blue-100 rounded-t"></div>
-                    <div className="flex-1 h-32 bg-blue-100 rounded-t"></div>
-                    <div className="flex-1 h-20 bg-blue-100 rounded-t"></div>
-                    <div className="flex-1 h-36 bg-blue-100 rounded-t"></div>
-                    <div className="flex-1 h-28 bg-blue-100 rounded-t"></div>
-                    <div className="flex-1 h-40 bg-blue-100 rounded-t"></div>
-                    <div className="flex-1 h-48 bg-blue-100 rounded-t"></div>
+                  {/* Simple bar chart wired to revenueBuckets */}
+                  <div className="h-48 flex items-end gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
+                    {(() => {
+                      const max = Math.max(1, ...revenueBuckets.map(b => b.total));
+                      return revenueBuckets.map((b) => {
+                        const h = Math.max(4, Math.round((b.total / max) * 180));
+                        return <div key={b.label} className="flex-1 min-w-6 bg-blue-100 rounded-t relative" style={{ height: `${h}px` }} title={`${b.label}: ₹${b.total.toLocaleString()}`}></div>;
+                      });
+                    })()}
                   </div>
                   <div className="flex justify-between text-xs text-gray-500 mt-2">
-                    <span>Week 1</span>
-                    <span>Week 2</span>
-                    <span>Week 3</span>
-                    <span>Week 4</span>
+                    <span>{revenueBuckets[0]?.label || ''}</span>
+                    <span>{revenueBuckets[revenueBuckets.length - 1]?.label || ''}</span>
                   </div>
                 </div>
               </Card>
