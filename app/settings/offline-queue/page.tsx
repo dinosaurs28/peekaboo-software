@@ -24,6 +24,8 @@ export default function OfflineQueuePage() {
 
   useEffect(() => { refresh(); }, []);
 
+  const failed = useMemo(() => items.filter(i => (i.attempts || 0) > 0), [items]);
+
   if (loading) return <div className="p-6">Loading…</div>;
   if (!user || role !== 'admin') {
     return (
@@ -63,8 +65,6 @@ export default function OfflineQueuePage() {
       await refresh();
     } finally { setBusy(false); }
   }
-
-  const failed = useMemo(() => items.filter(i => (i.attempts || 0) > 0), [items]);
 
   return (
     <div className="p-4 space-y-4">
