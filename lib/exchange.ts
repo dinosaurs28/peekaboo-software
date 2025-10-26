@@ -16,6 +16,8 @@ export type ExchangeRequest = {
   paymentReferenceId?: string;
   refundMethod?: 'cash'|'card'|'upi'|'wallet';
   refundReferenceId?: string;
+  // Optional idempotency key to prevent duplicate processing on retries
+  opId?: string;
 };
 
 export async function performExchange(req: ExchangeRequest): Promise<{ exchangeId: string; newInvoiceId?: string; refundId?: string; difference: number }>{
