@@ -43,21 +43,21 @@ export default function InvoiceDetailsPage() {
     });
   }, [invoice]);
 
-  if (loading) return <div className="p-8">Loading...</div>;
-  if (!user) return null;
-
-  const canPrint = role === "admin";
   const canExchange = useMemo(() => {
     if (!invoice) return false;
     try {
       const issued = new Date(invoice.issuedAt);
       const now = new Date();
       // calendar-day window check (client-side rough check; server enforces precisely)
-      const ms = now.getTime() - issued.getTime();
-      const days = ms / (1000 * 60 * 60 * 24);
-      return days <= 7.0;
+      const dayDiff = Math.floor((now.getTime() - issued.getTime()) / (24 * 60 * 60 * 1000));
+      return dayDiff <= 7;
     } catch { return false; }
   }, [invoice]);
+
+  if (loading) return <div className="p-8">Loading...</div>;
+  if (!user) return null;
+
+  const canPrint = role === "admin";
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
