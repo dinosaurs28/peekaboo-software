@@ -34,6 +34,8 @@ export default function DashboardPage() {
   const [expenses, setExpenses] = useState(0);
   const [newCustomers, setNewCustomers] = useState(0);
   const [costMap, setCostMap] = useState<Record<string, number>>({});
+  const [productMeta, setProductMeta] = useState<Record<string, { name: string; category?: string }>>({});
+  const [topItems, setTopItems] = useState<Array<{ productId: string; name: string; category?: string; units: number; revenue: number }>>([]);
 
   // Compute ISO bounds based on selected dates
   const fromIso = useMemo(() => {
@@ -62,8 +64,15 @@ export default function DashboardPage() {
   useEffect(() => {
     listProducts().then((prods) => {
       const m: Record<string, number> = {};
-      prods.forEach((p) => { if (p.id) m[p.id] = p.costPrice ?? 0; });
+      const meta: Record<string, { name: string; category?: string }> = {};
+      prods.forEach((p) => {
+        if (p.id) {
+          m[p.id] = p.costPrice ?? 0;
+          meta[p.id] = { name: p.name, category: p.category };
+        }
+      });
       setCostMap(m);
+      setProductMeta(meta);
     }).catch(() => undefined);
   }, []);
 
@@ -78,6 +87,7 @@ export default function DashboardPage() {
     const unsub = onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
       let rev = 0;
       let exp = 0;
+      const agg = new Map<string, { productId: string; name: string; category?: string; units: number; revenue: number }>();
       snap.docs.forEach((d) => {
         const data = d.data() as Record<string, unknown>;
         const grand = typeof data.grandTotal === 'number' ? data.grandTotal : Number(data.grandTotal ?? 0);
@@ -89,13 +99,31 @@ export default function DashboardPage() {
           const qty = typeof it.quantity === 'number' ? it.quantity : Number(it.quantity ?? 0);
           const cost = costMap[pid] ?? 0;
           exp += cost * (Number.isFinite(qty) ? qty : 0);
+
+          // Aggregate Top Selling Items
+          if (pid) {
+            const name = typeof it.name === 'string' && it.name ? it.name : (productMeta[pid]?.name || pid);
+            const category = productMeta[pid]?.category;
+            const unitPrice = typeof it.unitPrice === 'number' ? it.unitPrice : Number(it.unitPrice ?? 0);
+            const disc = typeof it.discountAmount === 'number' ? it.discountAmount : Number(it.discountAmount ?? 0);
+            const lineRevenue = Math.max(0, unitPrice * (Number.isFinite(qty) ? qty : 0) - (Number.isFinite(disc) ? disc : 0));
+            const cur = agg.get(pid) || { productId: pid, name, category, units: 0, revenue: 0 };
+            cur.units += Number.isFinite(qty) ? qty : 0;
+            cur.revenue += Number.isFinite(lineRevenue) ? lineRevenue : 0;
+            // Preserve name/category from meta if available
+            if (productMeta[pid]?.name) cur.name = productMeta[pid]!.name!;
+            if (productMeta[pid]?.category) cur.category = productMeta[pid]!.category;
+            agg.set(pid, cur);
+          }
         });
       });
       setRevenue(rev);
       setExpenses(exp);
+      const list = Array.from(agg.values()).sort((a, b) => (b.units - a.units) || (b.revenue - a.revenue));
+      setTopItems(list);
     });
     return () => unsub();
-  }, [fromIso, toIso, costMap]);
+  }, [fromIso, toIso, costMap, productMeta]);
 
   // New customers in selected range by createdAt timestamp
   useEffect(() => {
@@ -138,7 +166,7 @@ export default function DashboardPage() {
               {/* Header */}
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-                <p className="text-sm text-gray-500 mt-1">Overview of your store's performance</p>
+                <p className="text-sm text-gray-500 mt-1">Overview of your store&apos;s performance</p>
               </div>
 
               {/* Date Filter */}
@@ -169,8 +197,8 @@ export default function DashboardPage() {
                 />
                 <StatCard
                   label="Top Selling Item"
-                  value="—"
-                  subtext="Coming soon"
+                  value={topItems.length > 0 ? topItems[0].name : '—'}
+                  subtext={rangeSubtext}
                   className="bg-white"
                 />
                 <StatCard
@@ -228,24 +256,20 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-b border-gray-100">
-                        <td className="py-3 px-4 text-sm text-gray-900">Rainbow Unicorn Plushie</td>
-                        <td className="py-3 px-4 text-sm text-blue-600">Toys</td>
-                        <td className="py-3 px-4 text-sm text-gray-600 text-right">120</td>
-                        <td className="py-3 px-4 text-sm text-gray-900 text-right">₹1,200</td>
-                      </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="py-3 px-4 text-sm text-gray-900">Sparkly Princess Dress</td>
-                        <td className="py-3 px-4 text-sm text-blue-600">Clothing</td>
-                        <td className="py-3 px-4 text-sm text-gray-600 text-right">100</td>
-                        <td className="py-3 px-4 text-sm text-gray-900 text-right">₹1,600</td>
-                      </tr>
-                      <tr>
-                        <td className="py-3 px-4 text-sm text-gray-900">Baby Care Set</td>
-                        <td className="py-3 px-4 text-sm text-blue-600">Baby Care</td>
-                        <td className="py-3 px-4 text-sm text-gray-600 text-right">80</td>
-                        <td className="py-3 px-4 text-sm text-gray-900 text-right">₹800</td>
-                      </tr>
+                      {topItems.length === 0 ? (
+                        <tr>
+                          <td className="py-6 px-4 text-sm text-gray-500" colSpan={4}>No sales in the selected range.</td>
+                        </tr>
+                      ) : (
+                        topItems.slice(0, 10).map((it) => (
+                          <tr key={it.productId} className="border-b border-gray-100">
+                            <td className="py-3 px-4 text-sm text-gray-900">{it.name}</td>
+                            <td className="py-3 px-4 text-sm text-blue-600">{it.category || '—'}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600 text-right">{it.units}</td>
+                            <td className="py-3 px-4 text-sm text-gray-900 text-right">₹{it.revenue.toLocaleString()}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
