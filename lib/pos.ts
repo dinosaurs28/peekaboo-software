@@ -13,6 +13,8 @@ export type CheckoutInput = {
   cashierUserId?: string;
   customerId?: string;
   cashierName?: string;
+  // Optional idempotency key to prevent duplicate invoices on retries
+  opId?: string;
 };
 
 export async function checkoutCart(input: CheckoutInput): Promise<string> {
