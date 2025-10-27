@@ -3,8 +3,6 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import type { InvoiceDoc } from "@/lib/models";
 import { observeInvoices, type InvoiceFilters } from "@/lib/invoices";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card } from "@/components/ui/card";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { Input } from "@/components/ui/input";
@@ -47,26 +45,38 @@ export default function InvoicesPage() {
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen w-full bg-background text-foreground">
+    <div className="flex min-h-screen w-full bg-gray-50 text-foreground">
       <Sidebar />
       <div className="flex flex-col flex-1">
         <Topbar />
-        <main className="flex-1 p-6 space-y-4">
-          <h1 className="text-xl font-semibold">Invoices</h1>
+        <main className="flex-1 p-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
+              <p className="text-xs text-gray-500 mt-1">View and manage past invoices.</p>
+            </div>
+          </div>
+
+          {/* Filter chips removed per request; existing filter card retained below for admin */}
+
           {role === "admin" && (
-            <Card className="p-4">
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="flex flex-col">
-                  <label className="text-xs text-muted-foreground">From</label>
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">From</label>
                   <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
                 </div>
-                <div className="flex flex-col">
-                  <label className="text-xs text-muted-foreground">To</label>
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">To</label>
                   <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
                 </div>
-                <div className="flex flex-col">
-                  <label className="text-xs text-muted-foreground">Status</label>
-                  <select className="h-9 rounded-md border bg-background px-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value as InvoiceDoc["status"] | "")}>
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">Status</label>
+                  <select
+                    className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as InvoiceDoc["status"] | "")}
+                  >
                     <option value="">All</option>
                     <option value="paid">Paid</option>
                     <option value="partial">Partial</option>
@@ -74,59 +84,72 @@ export default function InvoicesPage() {
                     <option value="void">Void</option>
                   </select>
                 </div>
-                <div className="flex flex-col">
-                  <label className="text-xs text-muted-foreground">Cashier (UID)</label>
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">Cashier (UID)</label>
                   <Input placeholder="uid starts-with or full" value={cashier} onChange={(e) => setCashier(e.target.value)} />
                 </div>
-                <button
-                  className="h-9 px-4 rounded-md border text-sm font-medium hover:bg-muted"
-                  onClick={() => { setFrom(""); setTo(""); setStatus(""); setCashier(""); }}
-                >Clear</button>
               </div>
-            </Card>
+              <div className="flex justify-end pt-3">
+                <button
+                  className="h-9 px-3 rounded-md border text-sm font-medium hover:bg-gray-50"
+                  onClick={() => { setFrom(""); setTo(""); setStatus(""); setCashier(""); }}
+                >Clear filters</button>
+              </div>
+            </div>
           )}
-          <Card className="p-0">
-            <div className="px-6 pt-4 pb-2 text-sm text-muted-foreground">
+
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-6 pt-4 pb-2 text-sm text-gray-500 border-b bg-white/50">
               {invoicesLoading ? "Loading invoices…" : `${invoices.length} invoice(s)`}
             </div>
-            <div className="px-6 pb-4 overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[160px]">Invoice #</TableHead>
-                    <TableHead>Issued</TableHead>
-                    <TableHead className="text-right">Subtotal</TableHead>
-                    <TableHead className="text-right">Discount</TableHead>
-                    <TableHead className="text-right">Grand Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Cashier</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-left">
+                  <tr>
+                    <th className="px-6 py-3 text-gray-600 w-[160px]">Invoice ID</th>
+                    <th className="px-6 py-3 text-gray-600">Date</th>
+                    <th className="px-6 py-3 text-gray-600 text-right">Subtotal</th>
+                    <th className="px-6 py-3 text-gray-600 text-right">Discount</th>
+                    <th className="px-6 py-3 text-gray-600 text-right">Grand Total</th>
+                    <th className="px-6 py-3 text-gray-600">Status</th>
+                    <th className="px-6 py-3 text-gray-600">Cashier</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {invoices.map((inv) => (
-                    <TableRow
+                    <tr
                       key={inv.id}
-                      className="cursor-pointer hover:bg-muted/40"
+                      className="border-t cursor-pointer hover:bg-gray-50"
                       onClick={() => { window.location.href = `/invoices/${inv.id}`; }}
                     >
-                      <TableCell>{inv.invoiceNumber}</TableCell>
-                      <TableCell>{new Date(inv.issuedAt).toLocaleString()}</TableCell>
-                      <TableCell className="text-right">₹{inv.subtotal.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">₹{(inv.discountTotal ?? 0).toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-medium">₹{inv.grandTotal.toFixed(2)}</TableCell>
-                      <TableCell>{inv.status}</TableCell>
-                      <TableCell>{inv.cashierName || inv.cashierUserId.slice(0, 6)}</TableCell>
-                    </TableRow>
+                      <td className="px-6 py-3 font-medium text-gray-900 hover:underline hover:text-sky-600">{inv.invoiceNumber}</td>
+                      <td className="px-6 py-3">{new Date(inv.issuedAt).toLocaleString()}</td>
+                      <td className="px-6 py-3 text-right">₹{inv.subtotal.toFixed(2)}</td>
+                      <td className="px-6 py-3 text-right">₹{(inv.discountTotal ?? 0).toFixed(2)}</td>
+                      <td className="px-6 py-3 text-right font-medium text-sky-600">₹{inv.grandTotal.toFixed(2)}</td>
+                      <td className="px-6 py-3">
+                        <span className={
+                          `inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ` +
+                          (inv.status === 'paid' ? 'bg-gray-100 text-gray-700' :
+                            inv.status === 'partial' ? 'bg-amber-100 text-amber-700' :
+                              inv.status === 'unpaid' ? 'bg-red-100 text-red-700' :
+                                'bg-red-100 text-red-700')
+                        }>
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3">{inv.cashierName || inv.cashierUserId.slice(0, 6)}</td>
+                    </tr>
                   ))}
                   {invoices.length === 0 && !invoicesLoading && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-muted-foreground">No invoices yet.</TableCell>
-                    </TableRow>
+                    <tr>
+                      <td className="px-6 py-6 text-center text-gray-500" colSpan={7}>No invoices yet.</td>
+                    </tr>
                   )}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
-          </Card>
+          </div>
         </main>
       </div>
     </div>
