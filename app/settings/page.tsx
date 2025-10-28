@@ -11,13 +11,14 @@ import { useState, useMemo } from "react";
 export default function SettingsIndexPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  type TabKey = "store" | "categories" | "barcodes" | "receive" | "inventory" | "offers" | "offline";
+  type TabKey = "store" | "receipt" | "categories" | "barcodes" | "receive" | "inventory" | "offers" | "offline";
   const [tab, setTab] = useState<TabKey>("store");
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
   const items: { key: TabKey; label: string }[] = [
     { key: "store", label: "Store Details" },
+    { key: "receipt", label: "Receipt Template" },
     { key: "categories", label: "Categories" },
     { key: "barcodes", label: "Barcode Generation" },
     { key: "receive", label: "Stock Receiving" },
@@ -31,6 +32,8 @@ export default function SettingsIndexPage() {
     switch (tab) {
       case "store":
         return dynamic(() => import("./business-profile/page").then(m => m.default), { ssr: false });
+      case "receipt":
+        return dynamic(() => import("./receipt-template/page").then(m => m.default), { ssr: false });
       case "categories":
         return dynamic(() => import("./categories/page").then(m => m.default), { ssr: false });
       case "barcodes":
