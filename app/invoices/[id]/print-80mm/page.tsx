@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -25,8 +25,22 @@ export default function InvoicePrintThermalPage() {
   const gstin = settings?.gstin || 'XXYYYYZZZZ';
   const footer = settings?.receiptFooterNote || 'Thank you!';
   const logo = settings?.logoUrl;
+  const paperWidthMm = useMemo(() => {
+    const w = Number(settings?.receiptPaperWidthMm || 80);
+    if (!isFinite(w) || w <= 0) return 80;
+    return Math.min(Math.max(w, 40), 120);
+  }, [settings?.receiptPaperWidthMm]);
+  const showTax = settings?.showTaxLine ?? true;
+  const showReview = !!settings?.showReviewLink && !!settings?.googleReviewUrl;
+  const reviewUrl = settings?.googleReviewUrl || '';
   return (
-    <div className="mx-auto" style={{ width: '80mm' }}>
+    <div className="mx-auto" style={{ width: `${paperWidthMm}mm` }}>
+      {/* Print-specific page size to constrain content to receipt width */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `@media print { @page { size: ${paperWidthMm}mm auto; margin: 0; } }`,
+        }}
+      />
       <div className="p-2 text-xs">
         <div className="text-center">
           {logo ? <img src={logo} alt="Logo" className="h-10 mx-auto mb-1" /> : null}
@@ -66,11 +80,19 @@ export default function InvoicePrintThermalPage() {
         <div className="space-y-1">
           <div className="flex justify-between"><span>Subtotal</span><span>₹{inv.subtotal.toFixed(2)}</span></div>
           <div className="flex justify-between"><span>Discount</span><span>₹{(inv.discountTotal ?? 0).toFixed(2)}</span></div>
-          <div className="flex justify-between"><span>GST</span><span>₹{(inv.taxTotal ?? 0).toFixed(2)}</span></div>
+          {showTax ? (
+            <div className="flex justify-between"><span>GST</span><span>₹{(inv.taxTotal ?? 0).toFixed(2)}</span></div>
+          ) : null}
           <div className="flex justify-between font-semibold"><span>Total</span><span>₹{inv.grandTotal.toFixed(2)}</span></div>
         </div>
         <div className="my-2 border-t border-dashed" />
-        <div className="text-center">{footer}</div>
+        {showReview ? (
+          <div className="text-center break-all">
+            <div className="mb-1">Review us:</div>
+            <div className="underline">{reviewUrl}</div>
+          </div>
+        ) : null}
+        <div className="text-center mt-1">{footer}</div>
       </div>
     </div>
   );
