@@ -289,3 +289,15 @@ Indexes
 Tips
 - For thermal printers, set custom paper width matching Receipt Template (e.g., 80mm) and use 100% scale; disable browser headers/footers
 - If any query shows an index error, deploy via Firebase CLI and retry once the index is active
+
+
+### Fixes Needed After Testing
+1. The Low Stock Items doesnt show all the items low on stock, shows only one. And let the low stock card have Today filter only and doesnt change on date range filters, because it doesnt mattr what is the date range, today the stock is low is what matters. So let that stat card be defaulted permanently to Today.
+
+2. We will remove stock receive low permanently. Alternate solution will give later.
+
+3. Remove Add to Stock on export from bar code generation flow.
+
+4. Whenever the qty is added in the billing make sure that many qty is oresent in the Inventory and not blindly add the qty. If the inventory stock is less than the added qty in billing then billing checkout shouldnt proceed, and should show toast telling insufficient qty.
+
+5. Exchange gives some error, and doesnt confirm exchange.
