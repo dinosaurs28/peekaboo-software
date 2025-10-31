@@ -6,8 +6,9 @@ export function OfflineQueueStarter() {
   const [pending, setPending] = useState<number>(0);
   useEffect(() => {
     ensureSyncStarted();
-    // Register service worker for PWA/offline caching
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    // Register service worker only in production or when explicitly enabled
+    const enableSw = process.env.NEXT_PUBLIC_ENABLE_SW === '1' || process.env.NODE_ENV === 'production';
+    if (enableSw && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => { });
     }
     let mounted = true;
