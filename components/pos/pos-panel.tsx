@@ -373,16 +373,26 @@ export function PosPanel() {
     }
 
     setCart((prev) => {
-      const idx = prev.findIndex((l) => l.product.id === product.id);
+      const idx = prev.findIndex((l) => l.product.id === product!.id);
+      const max = Math.max(0, Number(product!.stock ?? 0));
       if (idx >= 0) {
         const copy = [...prev];
+        if (copy[idx].qty >= max) {
+          showToast('error', `Only ${max} in stock`);
+          setSelectedIndex(idx);
+          return copy;
+        }
         copy[idx] = { ...copy[idx], qty: copy[idx].qty + 1 };
-        showToast('success', `${product.name} × ${copy[idx].qty}`);
+        showToast('success', `${product!.name} × ${copy[idx].qty}`);
         setSelectedIndex(idx);
         return copy;
       }
-      showToast('success', `${product.name} added`);
-      const next = [...prev, { product, qty: 1 }];
+      if (max <= 0) {
+        showToast('error', `${product!.name} is out of stock`);
+        return prev;
+      }
+      showToast('success', `${product!.name} added`);
+      const next = [...prev, { product: product!, qty: 1 }];
       setSelectedIndex(next.length - 1);
       return next;
     });
@@ -393,7 +403,15 @@ export function PosPanel() {
 
   function increment(id?: string) {
     if (!id) return;
-    setCart((prev) => prev.map((l) => (l.product.id === id ? { ...l, qty: l.qty + 1 } : l)));
+    setCart((prev) => prev.map((l) => {
+      if (l.product.id !== id) return l;
+      const max = Math.max(0, Number(l.product.stock ?? 0));
+      if (l.qty >= max) {
+        showToast('error', `Only ${max} in stock`);
+        return l;
+      }
+      return { ...l, qty: l.qty + 1 };
+    }));
   }
 
   function decrement(id?: string) {
@@ -422,7 +440,17 @@ export function PosPanel() {
 
   function setQty(id?: string, qty?: number) {
     if (!id || qty == null) return;
-    setCart((prev) => prev.map((l) => (l.product.id === id ? { ...l, qty: Math.max(1, Math.floor(qty)) } : l)));
+    setCart((prev) => prev.map((l) => {
+      if (l.product.id !== id) return l;
+      const raw = Math.max(1, Math.floor(qty));
+      const max = Math.max(0, Number(l.product.stock ?? 0));
+      const next = Math.min(raw, Math.max(0, max));
+      if (next !== raw) {
+        showToast('error', `Only ${max} in stock`);
+      }
+      // If max is 0, keep qty at 1 visually but it won't pass checkout; we cap to 0->prevent line?
+      return { ...l, qty: Math.max(1, next) };
+    }));
   }
 
   function setItemDiscount(id?: string, disc?: number) {
@@ -443,10 +471,21 @@ export function PosPanel() {
       const idx = prev.findIndex((l) => l.product.id === p.id);
       if (idx >= 0) {
         const copy = [...prev];
+        const max = Math.max(0, Number(p.stock ?? 0));
+        if (copy[idx].qty >= max) {
+          showToast('error', `Only ${max} in stock`);
+          setSelectedIndex(idx);
+          return copy;
+        }
         copy[idx] = { ...copy[idx], qty: copy[idx].qty + 1 };
         showToast('success', `${p.name} × ${copy[idx].qty}`);
         setSelectedIndex(idx);
         return copy;
+      }
+      const max = Math.max(0, Number(p.stock ?? 0));
+      if (max <= 0) {
+        showToast('error', `${p.name} is out of stock`);
+        return prev;
       }
       showToast('success', `${p.name} added`);
       const next = [...prev, { product: p, qty: 1 }];
@@ -502,6 +541,12 @@ export function PosPanel() {
 
   async function onCheckout() {
     if (cart.length === 0) return;
+    // Client-side guard against overselling. Final enforcement happens in backend transaction.
+    const over = cart.find(l => Math.max(0, Number(l.product.stock ?? 0)) < l.qty);
+    if (over) {
+      showToast('error', `Insufficient stock for ${over.product.name}. Available: ${Math.max(0, Number(over.product.stock ?? 0))}`);
+      return;
+    }
     setBusy(true);
     try {
       // Resolve customerId by phone
@@ -872,8 +917,8 @@ export function PosPanel() {
                         type="button"
                         onClick={() => applyOffer(o.id!)}
                         className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${offerAppliedId === o.id
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
                           }`}
                       >
                         {o.name}
@@ -931,8 +976,8 @@ export function PosPanel() {
                 type="button"
                 onClick={() => setPaymentMethod(method)}
                 className={`flex-1 py-3 rounded-lg font-medium text-sm transition-colors ${paymentMethod === method
-                    ? 'bg-gray-200 text-gray-900'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  ? 'bg-gray-200 text-gray-900'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                   }`}
               >
                 {method.charAt(0).toUpperCase() + method.slice(1)}
