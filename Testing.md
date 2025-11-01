@@ -294,10 +294,16 @@ Tips
 ### Fixes Needed After Testing
 1. The Low Stock Items doesnt show all the items low on stock, shows only one. And let the low stock card have Today filter only and doesnt change on date range filters, because it doesnt mattr what is the date range, today the stock is low is what matters. So let that stat card be defaulted permanently to Today.
 
-2. We will remove stock receive low permanently. Alternate solution will give later.
+2. Remove stock receive flow permanently.
 
 3. Remove Add to Stock on export from bar code generation flow.
 
-4. Whenever the qty is added in the billing make sure that many qty is oresent in the Inventory and not blindly add the qty. If the inventory stock is less than the added qty in billing then billing checkout shouldnt proceed, and should show toast telling insufficient qty.
+4. [Fixed] Whenever the qty is added in the billing make sure, that many qty is present in the Inventory and not blindly add the qty. If the inventory stock is less than the added qty in billing then billing checkout shouldnt proceed, and should show toast telling insufficient qty.
+  - Implemented: POS caps per-line quantities to current stock with toasts; checkout is blocked if any line exceeds stock; backend transaction re-validates stock atomically to prevent negative inventory.
 
-5. Exchange gives some error, and doesnt confirm exchange.
+5. [Fixed] Exchange gives some error, and doesnt confirm exchange.
+   - Implemented:
+     - Multiple exchanges per product allowed up to original quantity; we track prior returned qty and cap remaining.
+     - New items stock validated atomically in a transaction; clear error if insufficient.
+     - UI shows remaining returnable qty and blocks inputs when none remain; new items respect current stock with toasts.
+     - Money handling: if newSubtotal > returnCredit, a new invoice is created for the difference (paid via selected method); if returnCredit > newSubtotal, a refund record is created.
