@@ -27,14 +27,20 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
   const invSnap = await getDoc(doc(dbx, COLLECTIONS.invoices, req.originalInvoiceId));
   if (!invSnap.exists()) throw new Error("Original invoice not found");
   const inv = invSnap.data() as any as InvoiceDoc;
-  // Enforce one exchange per product per invoice: collect prior returned productIds
+  // Track prior returned quantities per product (allow multiple exchanges up to original qty)
   const priorQ = query(collection(dbx, COLLECTIONS.exchanges), where('originalInvoiceId', '==', req.originalInvoiceId));
   const priorSnap = await getDocs(priorQ);
-  const alreadyExchanged = new Set<string>();
+  const priorReturnedQty = new Map<string, number>();
   priorSnap.forEach(d => {
     const data = d.data() as any;
     const ret: any[] = Array.isArray(data.returned) ? data.returned : [];
-    for (const r of ret) if (r?.productId) alreadyExchanged.add(r.productId);
+    for (const r of ret) {
+      if (r?.productId && Number(r?.qty) > 0) {
+        const pid = String(r.productId);
+        const prev = priorReturnedQty.get(pid) || 0;
+        priorReturnedQty.set(pid, prev + Number(r.qty));
+      }
+    }
   });
 
 
@@ -56,10 +62,11 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
 
   // Compute credit per returned line using paid price including proportional bill discount
   const returnLines = req.returned.map((r) => {
-    if (alreadyExchanged.has(r.productId)) throw new Error("This product has already been exchanged for this invoice");
     const li = lineMap.get(r.productId);
     if (!li) throw new Error("Returned product not in original invoice");
-    if (!(r.qty > 0 && r.qty <= li.qty)) throw new Error("Invalid return quantity");
+    const prevReturned = priorReturnedQty.get(r.productId) || 0;
+    const remaining = Math.max(0, li.qty - prevReturned);
+    if (!(r.qty > 0 && r.qty <= remaining)) throw new Error(`Invalid return quantity. Remaining returnable qty: ${remaining}`);
     const base = li.unitPrice; // per unit base
     // Proportional share of remaining bill discount per unit based on original proportions
     const lineBaseTotal = li.unitPrice * li.qty;
@@ -124,6 +131,25 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
 
     let createdInvoiceId: string | undefined;
     let createdRefundId: string | undefined;
+
+    // Validate stock for new items before creating invoice (atomic within transaction)
+    if (newLines.length > 0) {
+      const needByProduct = new Map<string, number>();
+      for (const n of newLines) {
+        needByProduct.set(n.productId, (needByProduct.get(n.productId) || 0) + n.qty);
+      }
+      for (const [pid, need] of needByProduct.entries()) {
+        const pRef = doc(dbx, COLLECTIONS.products, pid);
+        const snap = await (tx as any).get(pRef);
+        if (!snap.exists()) throw new Error(`Product not found: ${pid}`);
+        const data = snap.data() as any;
+        const curr = Number(data?.stock ?? 0) || 0;
+        if (need > curr) {
+          const nm = typeof data?.name === 'string' ? data.name : 'Item';
+          throw new Error(`Insufficient stock for ${nm}. Available: ${curr}, requested: ${need}`);
+        }
+      }
+    }
 
     // New invoice if there are new items
     if (newLines.length > 0) {
