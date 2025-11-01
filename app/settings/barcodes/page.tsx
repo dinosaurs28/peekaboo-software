@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import JsBarcode from "jsbarcode";
 import jsPDF from "jspdf";
 import { listProducts, incrementPrintedCount } from "@/lib/products";
-import { receiveStock } from "@/lib/pos";
 import type { ProductDoc } from "@/lib/models";
 import { categoryCode } from "@/lib/models";
 import { listCategories } from "@/lib/categories";
@@ -63,7 +62,7 @@ export default function BarcodeGeneratorPage() {
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [categories, setCategories] = useState<CategoryDoc[]>([]);
-  const [alsoReceive, setAlsoReceive] = useState<boolean>(false);
+  // Removed: Add to stock on export (deprecated per testing feedback)
 
   useEffect(() => {
     if (loading) return;
@@ -159,19 +158,6 @@ export default function BarcodeGeneratorPage() {
 
       doc.save(`barcodes_${selected.sku}_${Date.now()}.pdf`);
       const count = Math.max(1, Math.min(300, Math.floor(qty)));
-      // Optionally receive into stock to reflect new arrivals
-      if (alsoReceive && selected.id) {
-        try {
-          await receiveStock({
-            createdByUserId: user!.uid,
-            note: 'Auto-received via label print',
-            lines: [{ productId: selected.id, sku: selected.sku, name: selected.name, qty: count }],
-          });
-        } catch (e) {
-          console.error('Auto receive failed', e);
-          alert('Labels exported, but adding to stock failed. Please use Receive Stock to adjust.');
-        }
-      }
       // Update printed count after successful save
       if (selected.id) await incrementPrintedCount(selected.id, count);
     } catch (e) {
@@ -207,10 +193,6 @@ export default function BarcodeGeneratorPage() {
             <Input type="number" min={1} max={300} value={qty} onChange={(e) => setQty(Number(e.target.value))} />
           </div>
           <div className="flex items-end gap-3">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={alsoReceive} onChange={e => setAlsoReceive(e.target.checked)} />
-              <span>Add to stock on export</span>
-            </label>
             <Button onClick={exportPdf} disabled={!selected || busy}>
               {busy ? "Exporting…" : "Export PDF"}
             </Button>
