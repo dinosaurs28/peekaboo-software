@@ -11,7 +11,7 @@ import { useState, useMemo } from "react";
 export default function SettingsIndexPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  type TabKey = "store" | "receipt" | "categories" | "barcodes" | "receive" | "inventory" | "offers" | "offline";
+  type TabKey = "store" | "receipt" | "categories" | "barcodes" | "inventory" | "offers" | "offline";
   const [tab, setTab] = useState<TabKey>("store");
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -21,7 +21,6 @@ export default function SettingsIndexPage() {
     { key: "receipt", label: "Receipt Template" },
     { key: "categories", label: "Categories" },
     { key: "barcodes", label: "Barcode Generation" },
-    { key: "receive", label: "Stock Receiving" },
     { key: "inventory", label: "Inventory Logs" },
     { key: "offers", label: "Offers" },
     { key: "offline", label: "Offline Queue" },
@@ -38,8 +37,6 @@ export default function SettingsIndexPage() {
         return dynamic(() => import("./categories/page").then(m => m.default), { ssr: false });
       case "barcodes":
         return dynamic(() => import("./barcodes/page").then(m => m.default), { ssr: false });
-      case "receive":
-        return dynamic(() => import("./receive/page").then(m => m.default), { ssr: false });
       case "inventory":
         return dynamic(() => import("./inventory-logs/page").then(m => m.default), { ssr: false });
       case "offers":
