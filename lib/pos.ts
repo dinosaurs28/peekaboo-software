@@ -75,6 +75,13 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
 
   // Transaction: decrement stock for each product and then create invoice
   const invoiceId = await runTransaction(dbx, async (tx) => {
+    // Aggregate requested quantities per product to validate stock atomically
+    const qtyByProduct = new Map<string, number>();
+    for (const l of input.lines) {
+      const prev = qtyByProduct.get(l.productId) || 0;
+      qtyByProduct.set(l.productId, prev + l.qty);
+    }
+
     // Prepare invoice reference first to use id in logs
     const invRef = doc(collection(dbx, COLLECTIONS.invoices));
 
@@ -93,7 +100,22 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
     // Bump counter
     tx.set(settingsRef, { invoicePrefix: prefix, nextInvoiceSequence: nextSeq + 1, updatedAt: serverTimestamp() }, { merge: true });
 
-    // Decrement stock and create inventory logs per line
+    // Validate stock levels for all involved products and then decrement stock with logs
+    for (const [productId, requested] of qtyByProduct.entries()) {
+      const pRef = doc(dbx, COLLECTIONS.products, productId);
+      const snap = await tx.get(pRef);
+      if (!snap.exists()) {
+        throw new Error(`Product not found: ${productId}`);
+      }
+      const pdata = snap.data() as any;
+      const current = Number(pdata?.stock ?? 0) || 0;
+      if (requested > current) {
+        const name = typeof pdata?.name === 'string' ? pdata.name : 'Item';
+        throw new Error(`Insufficient stock for ${name}. Available: ${current}, requested: ${requested}`);
+      }
+    }
+
+    // Decrement stock and create inventory logs per line (after validation)
     for (const l of input.lines) {
       const pRef = doc(dbx, COLLECTIONS.products, l.productId);
       tx.update(pRef, { stock: increment(-l.qty), updatedAt: serverTimestamp() });
