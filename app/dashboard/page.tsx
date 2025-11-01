@@ -11,7 +11,7 @@ import { PosPanel } from "@/components/pos/pos-panel";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, orderBy, query, where, getDocs, Timestamp, type DocumentData, type QuerySnapshot, type QueryConstraint } from "firebase/firestore";
 import { COLLECTIONS } from "@/lib/models";
-import { listProducts } from "@/lib/products";
+import { listProducts, observeLowStockProducts } from "@/lib/products";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
@@ -38,6 +38,7 @@ export default function DashboardPage() {
   const [topItems, setTopItems] = useState<Array<{ productId: string; name: string; category?: string; units: number; revenue: number }>>([]);
   const [revenueBuckets, setRevenueBuckets] = useState<Array<{ label: string; total: number }>>([]);
   const [prevRevenue, setPrevRevenue] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
 
   // Compute ISO bounds based on selected dates
   const fromIso = useMemo(() => {
@@ -82,6 +83,12 @@ export default function DashboardPage() {
       setCostMap(m);
       setProductMeta(meta);
     }).catch(() => undefined);
+  }, []);
+
+  // Low stock count (independent of date filters; always reflects current stock)
+  useEffect(() => {
+    const unsub = observeLowStockProducts((items) => setLowStockCount(items.length));
+    return () => { if (typeof unsub === 'function') unsub(); };
   }, []);
 
   // Revenue and expenses from invoices within selected date range
@@ -244,8 +251,8 @@ export default function DashboardPage() {
                 />
                 <StatCard
                   label="Low Stock Items"
-                  value={newCustomers}
-                  subtext={rangeSubtext}
+                  value={lowStockCount}
+                  subtext={"Today"}
                   className="bg-white"
                 />
               </div>
