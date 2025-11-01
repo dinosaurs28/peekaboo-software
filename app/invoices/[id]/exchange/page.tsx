@@ -24,7 +24,7 @@ export default function ExchangePage() {
   const [returns, setReturns] = useState<ReturnLineUI[]>([]);
   const [newLines, setNewLines] = useState<NewLineUI[]>([]);
   const [products, setProducts] = useState<ProductDoc[]>([]);
-  const [blockedProductIds, setBlockedProductIds] = useState<Set<string>>(new Set());
+  const [priorReturned, setPriorReturned] = useState<Map<string, number>>(new Map());
   const [scanValue, setScanValue] = useState("");
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -41,7 +41,7 @@ export default function ExchangePage() {
       if (invSnap.exists()) {
         const invoice = toInvoiceDoc(invSnap.id, invSnap.data() as any);
         setInv(invoice);
-        // Build return lines from original invoice items
+        // Build return lines from original invoice items (remaining qty will be updated after prior exchanges load)
         const merged = new Map<string, ReturnLineUI>();
         for (const it of invoice.items) {
           const cur = merged.get(it.productId);
@@ -52,16 +52,27 @@ export default function ExchangePage() {
         setReturns(Array.from(merged.values()));
       }
       setProducts(prodsSnap);
-      // Fetch prior exchanges to enforce one exchange per product per invoice
+      // Fetch prior exchanges to compute remaining returnable quantity per product
       const exQs = query(collection(db, 'Exchanges'), where('originalInvoiceId', '==', id));
       const exSnap = await getDocs(exQs);
-      const blocked = new Set<string>();
+      const prior = new Map<string, number>();
       exSnap.forEach(d => {
         const data = d.data() as any;
         const ret: any[] = Array.isArray(data.returned) ? data.returned : [];
-        for (const r of ret) if (r?.productId) blocked.add(r.productId);
+        for (const r of ret) {
+          if (r?.productId && Number(r?.qty) > 0) {
+            const pid = String(r.productId);
+            prior.set(pid, (prior.get(pid) || 0) + Number(r.qty));
+          }
+        }
       });
-      setBlockedProductIds(blocked);
+      setPriorReturned(prior);
+      // Adjust remaining maxQty in returns based on prior
+      setReturns(prev => prev.map(r => {
+        const used = prior.get(r.productId) || 0;
+        const remaining = Math.max(0, r.maxQty - used);
+        return { ...r, maxQty: remaining, qty: Math.min(r.qty, remaining) };
+      }));
     })();
   }, [id]);
 
@@ -84,16 +95,29 @@ export default function ExchangePage() {
       const idx = prev.findIndex(n => n.productId === prod.id);
       if (idx >= 0) {
         const copy = [...prev];
+        // Cap to stock
+        const max = Math.max(0, Number(prod.stock ?? 0));
+        if (copy[idx].qty >= max) { toast({ title: 'Insufficient stock', description: `Only ${max} in stock`, variant: 'destructive' }); return copy; }
         copy[idx] = { ...copy[idx], qty: copy[idx].qty + 1 };
         return copy;
       }
+      const max = Math.max(0, Number(prod.stock ?? 0));
+      if (max <= 0) { toast({ title: 'Out of stock', description: prod.name, variant: 'destructive' }); return prev; }
       return [...prev, { productId: prod.id!, name: prod.name, sku: prod.sku, qty: 1, unitPrice: prod.unitPrice }];
     });
     toast({ title: 'Added', description: `${prod.name}`, variant: 'success', duration: 1200 });
   }
 
   function setNewQty(pid: string, qty: number) {
-    setNewLines(prev => prev.map(n => n.productId === pid ? { ...n, qty: Math.max(1, Math.floor(qty || 1)) } : n));
+    setNewLines(prev => prev.map(n => {
+      if (n.productId !== pid) return n;
+      const prod = products.find(p => p.id === pid);
+      const max = Math.max(0, Number(prod?.stock ?? 0));
+      const raw = Math.max(1, Math.floor(qty || 1));
+      const next = Math.min(raw, Math.max(1, max));
+      if (next !== raw) { toast({ title: 'Insufficient stock', description: `Only ${max} in stock`, variant: 'destructive' }); }
+      return { ...n, qty: next };
+    }));
   }
   function removeNew(pid: string) { setNewLines(prev => prev.filter(n => n.productId !== pid)); }
 
@@ -102,7 +126,7 @@ export default function ExchangePage() {
 
   async function submitExchange() {
     if (!inv || !user) return;
-    const returned = returns.filter(r => r.qty > 0 && !blockedProductIds.has(r.productId)).map(r => ({ productId: r.productId, qty: r.qty, defect: r.defect }));
+    const returned = returns.filter(r => r.qty > 0).map(r => ({ productId: r.productId, qty: r.qty, defect: r.defect }));
     if (returned.length === 0 && newLines.length === 0) { toast({ title: 'Nothing to exchange', variant: 'warning' }); return; }
     setBusy(true);
     try {
@@ -166,14 +190,14 @@ export default function ExchangePage() {
             <tbody>
               {returns.map(r => (
                 <tr key={r.productId} className="border-t">
-                  <td className="px-2 py-2">{r.name} {blockedProductIds.has(r.productId) && <span className="text-xs text-red-600 ml-2">(already exchanged)</span>}</td>
+                  <td className="px-2 py-2">{r.name}</td>
                   <td className="px-2 py-2">{r.maxQty}</td>
                   <td className="px-2 py-2">
-                    <input type="number" className="h-8 w-24 border rounded px-2" value={r.qty} onChange={e => setReturnQty(r.productId, Number(e.target.value || 0))} disabled={blockedProductIds.has(r.productId)} />
+                    <input type="number" className="h-8 w-24 border rounded px-2" value={r.qty} onChange={e => setReturnQty(r.productId, Number(e.target.value || 0))} disabled={r.maxQty <= 0} />
                   </td>
                   <td className="px-2 py-2">
                     <label className="inline-flex items-center gap-2 text-xs">
-                      <input type="checkbox" checked={r.defect} onChange={e => setReturnDefect(r.productId, e.target.checked)} disabled={blockedProductIds.has(r.productId)} />
+                      <input type="checkbox" checked={r.defect} onChange={e => setReturnDefect(r.productId, e.target.checked)} disabled={r.maxQty <= 0} />
                       <span>Mark as defect</span>
                     </label>
                   </td>
