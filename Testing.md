@@ -43,53 +43,53 @@ Admin (≈4 minutes)
 ## Cashier Pass (single login)
 
 ### 1) Auth & RBAC
-- [ ] Login as Cashier
-- [ ] Sees POS and Invoices only; cannot access Settings/Reports/Offers
-- [ ] Direct URLs to admin pages are blocked
+- [1] Login as Cashier
+- [1] Sees POS and Invoices only; cannot access Settings/Reports/Offers
+- [1] Direct URLs to admin pages are blocked
 
 ### 2) POS – cart, discounts, totals
-- [ ] Add A twice (merge to qty=2)
-- [ ] Add B once
-- [ ] Line discount on A: ₹ amount (no negative totals)
-- [ ] Change line discount on A to % (no negative totals)
-- [ ] Bill-level discount: ₹, then % (separately)
-- [ ] Totals reflect line + bill discounts correctly
+- [1] Add A twice (merge to qty=2)
+- [1] Add B once
+- [1] Line discount on A: ₹ amount (no negative totals)
+- [1] Change line discount on A to % (no negative totals)
+- [1] Bill-level discount: ₹, then % (separately)
+- [1] Totals reflect line + bill discounts correctly
 
 Edge checks
-- [ ] Zero/negative discounts are blocked or corrected
+- [1] Zero/negative discounts are blocked or corrected
 - [ ] Long product names don’t break layout
 
 ### 3) Stock guardrails (no oversell)
-- [ ] For B (stock 4), try qty 5 via + button (blocked, toast “Only 4 in stock”)
-- [ ] For B, try qty 5 via rescans (blocked)
-- [ ] For B, enter 9999 manually (clamped with toast)
-- [ ] Add C (stock 0): blocked with “out of stock” toast
-- [ ] Attempt checkout while any line exceeds stock: blocked with “insufficient stock”
+- [1] For B (stock 4), try qty 5 via + button (blocked, toast “Only 4 in stock”)
+- [1] For B, try qty 5 via rescans (blocked)
+- [1] For B, enter 9999 manually (clamped with toast)
+- [1] Add C (stock 0): blocked with “out of stock” toast
+- [1] Attempt checkout while any line exceeds stock: blocked with “insufficient stock”
 
 ### 4) GST & totals
-- [ ] Buy A (0%) + B (5%), apply line and bill discounts
-- [ ] Tax equals sum of per‑line taxes after discounts
-- [ ] Grand total = subtotal − discounts + tax (rounded 2 decimals)
+- [1] Buy A (0%) + B (5%), apply line and bill discounts
+- [0] Tax equals sum of per‑line taxes after discounts
+- [0] Grand total = subtotal − discounts + tax (rounded 2 decimals)
 
 ### 5) Customer capture & loyalty (if used)
-- [ ] Enter phone for new customer; set name
-- [ ] Complete checkout: customer created and linked
-- [ ] Make another purchase with same phone: customer found and linked
-- [ ] Loyalty points and totalSpend updated
+- [1] Enter phone for new customer; set name
+- [1] Complete checkout: customer created and linked
+- [1] Make another purchase with same phone: customer found and linked
+- [1] Loyalty points and totalSpend updated
 
 Edge checks
-- [ ] Missing name for new customer blocks checkout
-- [ ] Bad phone format handled
+- [1] Missing name for new customer blocks checkout
+- [1] Bad phone format handled
 
 ### 6) Checkout & idempotency
-- [ ] Complete a cash sale (success)
-- [ ] Double‑click Complete Sale rapidly (only one invoice is created)
+- [1] Complete a cash sale (success)
+- [1] Double‑click Complete Sale rapidly (only one invoice is created)
 - [ ] Inventory decreases once; InventoryLogs shows one set of sale logs
 
 ### 7) Invoices & receipt printing (80mm only)
-- [ ] Open the recent invoice
-- [ ] Click Print Receipt (branding, math correct)
-- [ ] Auto‑print dialog opens; GST line and footer reflect Receipt Template settings
+- [1] Open the recent invoice
+- [1] Click Print Receipt (branding, math correct)
+- [1] Auto‑print dialog opens; GST line and footer reflect Receipt Template settings
 
 ### 8) Exchanges (if enabled)
 - [ ] Return B qty=1 (non‑defect) → confirm → stock +1; InventoryLogs type=return
@@ -105,23 +105,23 @@ Edge checks
 - [ ] Attempt returning product not in original invoice → blocked
 
 ### 9) Offline queue (optional)
-- [ ] Go Offline → attempt checkout (op queued)
-- [ ] Go Online → queue processes; exactly one invoice created
-- [ ] If stock changed while offline, op fails with “insufficient stock” and remains for review
+- [1] Go Offline → attempt checkout (op queued)
+- [1] Go Online → queue processes; exactly one invoice created
+- [1] If stock changed while offline, op fails with “insufficient stock” and remains for review
 
 ---
 
 ## Admin Pass (single login)
 
 ### 1) Auth & RBAC
-- [ ] Login as Admin
-- [ ] Sees Settings, Reports, Offers, Barcodes
-- [ ] Admin‑only pages remain blocked for Cashier
+- [1] Login as Admin
+- [1] Sees Settings, Reports, Offers, Barcodes
+- [1] Admin‑only pages remain blocked for Cashier
 
 ### 2) Receipt Template (80mm)
-- [ ] Update business profile (logo, address, GSTIN, footer)
-- [ ] Toggle GST line, review link
-- [ ] Print any invoice → changes reflect on receipt
+- [1] Update business profile (logo, address, GSTIN, footer)
+- [1] Toggle GST line, review link
+- [1] Print any invoice → changes reflect on receipt
 
 ### 3) Barcode generation and direct print (stock addition)
 - [ ] Settings → Barcodes → select product B → set Labels = 5 → Print Labels
@@ -167,4 +167,21 @@ Edge checks
 
 - [ ] Cashier: cannot oversell; prints correct 80mm receipt; exchanges behave; offline queue safe
 - [ ] Admin: can set branding, print labels (105×70 mm, 2 barcodes/label), sees audit entries, and data reconciles across Reports/Logs
+
+## FIXES
+After every save or button that the user hits on the web app, a success or error toast should be displayed on the botto right.
+
+Make sure for every confirmation buttons like Save, Checkout, Create etc this toast is added. Checkout its already added, do for others.
+
+Make sure the offers tab in Settings also accessible only for admin and not to cashier.
+
+The tax is applied when we print the receipts. But during the billing flow and when the invoice details are checked the tax is not included. So make sure that the tax is included in billing, invoices page too. And not just in the receipt.
+
+New customer the textboxes should be blank, and not have previous entered customer details.
+
+When the user hits checkout button the print receipt should open and print it. Also give an option to not print, in the print window that appears.
+
+When viewing invoice instead of customer id, make sure the customer name is fetched and displayed in the invoice details.
+
+The exchange increases the stock qty, but it doesnt tell the repayable amount to customer if exchanged item price is less than the returned one. Make sure the money handling is very robust.
 
