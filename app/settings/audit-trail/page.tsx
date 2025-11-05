@@ -40,7 +40,7 @@ export default function AuditTrailPage() {
     const col = collection(db, COLLECTIONS.inventoryLogs);
     const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc')];
     if (from) constraints.push(where('createdAt', '>=', new Date(from).toISOString()));
-    if (to) { const end = new Date(to); end.setHours(23,59,59,999); constraints.push(where('createdAt', '<=', end.toISOString())); }
+    if (to) { const end = new Date(to); end.setHours(23, 59, 59, 999); constraints.push(where('createdAt', '<=', end.toISOString())); }
     if (userId) constraints.push(where('userId', '==', userId));
     if (type) constraints.push(where('type', '==', type));
     if (productId) constraints.push(where('productId', '==', productId));
