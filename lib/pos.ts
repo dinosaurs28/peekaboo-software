@@ -85,9 +85,9 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
     // Prepare invoice reference first to use id in logs
     const invRef = doc(collection(dbx, COLLECTIONS.invoices));
 
-    // Sequential invoice number (prefix + zero-padded counter) from Settings/app
-    const settingsRef = doc(dbx, COLLECTIONS.settings, 'app');
-    const settingsSnap = await tx.get(settingsRef);
+  // Sequential invoice number (prefix + zero-padded counter) from Settings/app
+  const settingsRef = doc(dbx, COLLECTIONS.settings, 'app');
+  const settingsSnap = await tx.get(settingsRef);
     let prefix = 'INV';
     let nextSeq = 1;
     if (settingsSnap.exists()) {
@@ -97,10 +97,7 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
     }
     const seqStr = String(nextSeq).padStart(6, '0');
     const invoiceNumber = `${prefix}-${seqStr}`;
-    // Bump counter
-    tx.set(settingsRef, { invoicePrefix: prefix, nextInvoiceSequence: nextSeq + 1, updatedAt: serverTimestamp() }, { merge: true });
-
-    // Validate stock levels for all involved products and then decrement stock with logs
+    // Validate stock levels for all involved products (all reads must occur before any writes in a transaction)
     for (const [productId, requested] of qtyByProduct.entries()) {
       const pRef = doc(dbx, COLLECTIONS.products, productId);
       const snap = await tx.get(pRef);
@@ -114,6 +111,10 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
         throw new Error(`Insufficient stock for ${name}. Available: ${current}, requested: ${requested}`);
       }
     }
+
+    // From this point onwards, only writes
+    // Bump invoice counter
+    tx.set(settingsRef, { invoicePrefix: prefix, nextInvoiceSequence: nextSeq + 1, updatedAt: serverTimestamp() }, { merge: true });
 
     // Decrement stock and create inventory logs per line (after validation)
     for (const l of input.lines) {
