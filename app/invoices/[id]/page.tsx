@@ -57,7 +57,8 @@ export default function InvoiceDetailsPage() {
   if (loading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
 
-  const canPrint = role === "admin";
+  // Allow printing for both Admin and Cashier roles
+  const canPrint = role === "admin" || role === "cashier";
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
@@ -71,8 +72,7 @@ export default function InvoiceDetailsPage() {
             <div className="flex gap-2">
               {canPrint && (
                 <>
-                  <Button onClick={() => window.open(window.location.pathname + "/print-a4", "_blank")}>Print A4</Button>
-                  <Button variant="outline" onClick={() => window.open(window.location.pathname + "/print-80mm", "_blank")}>Print 80mm</Button>
+                  <Button onClick={() => window.open(`/invoices/receipt/${id}`, "_blank")}>Print Receipt</Button>
                 </>
               )}
               <Button variant="secondary" disabled={!canExchange} onClick={() => { if (canExchange) window.location.href = window.location.pathname + "/exchange"; }}>
@@ -133,9 +133,7 @@ export default function InvoiceDetailsPage() {
               <span>₹{invoice?.grandTotal.toFixed(2)}</span>
             </div>
           </Card>
-          {role === "cashier" && (
-            <div className="text-xs text-muted-foreground">Print is available for Admin only.</div>
-          )}
+          {/* Printing is available to both Admin and Cashier; opens unified receipt page */}
         </main>
       </div>
     </div>
