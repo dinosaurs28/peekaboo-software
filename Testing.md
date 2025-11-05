@@ -1,6 +1,6 @@
 # Peekaboo POS – Smoke Test and Role-based Testing Brief
 
-Use this guide to validate the full workflow quickly (Smoke Test) and then thoroughly (role-based feature-wise). It reflects the latest flows: 80mm receipt printing, direct barcode label printing (105×70 mm, 2 barcodes per label), transactional stock rules, and the Audit Trail.
+Use this guide to validate the full workflow quickly (Smoke Test) and then thoroughly (role-based feature-wise). It reflects the latest flows: 80mm receipt printing, direct barcode label printing (50×25 mm, 1 barcode per label), transactional stock rules, and the Audit Trail.
 
 ---
 
@@ -22,7 +22,9 @@ Admin (≈4 minutes)
 - [ ] Receipt Template: tweak 80mm options (GST line, footer) → print any invoice again
 	- Expect: Receipt reflects settings
 - [ ] Barcode print: Settings → Barcodes → choose a product, set labels=2 → Print Labels
-	- Expect: New tab 105×70 mm; 2 barcodes per label, rotated 90°; stock +4 (labels×2); Audit Trail shows entry (type=purchase, reason=receive, note=barcode-print)
+	- Expect: Same tab 50×25 mm; 1 barcode per label, horizontal; after print, the app asks “Did the labels print successfully?”
+	- If Yes: stock +2 (labels); Printed count +2; Audit Trail entry (type=purchase, reason=receive, note=barcode-print)
+	- If No: no stock/printed count change; return to Settings
 
 ---
 
@@ -123,9 +125,9 @@ Edge checks
 
 ### 3) Barcode generation and direct print (stock addition)
 - [ ] Settings → Barcodes → select product B → set Labels = 5 → Print Labels
-- [ ] Print page opens 105×70 mm; two barcodes per label (2×1 inch each), rotated 90°; 5 mm outer margins and 5 mm gap between barcodes
-- [ ] After closing print dialog: product stock increases by labels × 2 (e.g., +10)
-- [ ] Printed count increases by total barcodes printed (labels × 2)
+- [ ] Print page opens 50×25 mm; one barcode per label (2×1 inch target), horizontal
+- [ ] After closing print dialog: product stock increases by labels (e.g., +5)
+- [ ] Printed count increases by total barcodes printed (labels)
 - [ ] Audit Trail entry exists for this operation: type=purchase, reason=receive, note=barcode-print, userId=admin uid
 
 ### 4) Categories & Products
@@ -152,7 +154,7 @@ Edge checks
 
 - [ ] No negative inventory at any time
 - [ ] POS caps quantities client‑side; backend validates stock atomically (POS & exchanges)
-- [ ] Barcode print always adds labels × 2 to stock; one audit entry per print
+- [ ] Barcode print always adds labels to stock; one audit entry per print
 - [ ] Remaining returnable qty enforced across multi‑exchange scenarios
 - [ ] Defect returns don’t increase sellable stock (damage logged)
 - [ ] Totals math: subtotal − discounts + tax = grand total (2‑decimal rounding)
