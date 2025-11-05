@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import JsBarcode from "jsbarcode";
-import jsPDF from "jspdf";
-import { listProducts, incrementPrintedCount } from "@/lib/products";
+import { listProducts } from "@/lib/products";
 import type { ProductDoc } from "@/lib/models";
 import { categoryCode } from "@/lib/models";
 import { listCategories } from "@/lib/categories";
@@ -15,9 +14,9 @@ import type { CategoryDoc } from "@/lib/models";
 
 // Contract:
 // - Admin only access; others redirected to /login or /dashboard
-// - Load products; allow selecting one product and quantity
-// - Render preview of labels; Export to PDF (A4 3x10 grid by default)
-// - After successful export, increment product.printedCount by qty
+// - Load products; allow selecting one product and quantity (labels)
+// - Render preview of a horizontal barcode
+// - Print: open dedicated print page sized 50×25 mm with one barcode per label
 
 function encodeBarcode(p: ProductDoc, categories: CategoryDoc[]): string {
   // Prefer managed Category.code when Product.category matches a category name
@@ -30,28 +29,7 @@ function encodeBarcode(p: ProductDoc, categories: CategoryDoc[]): string {
   return `PB|${code}|${p.sku}`;
 }
 
-type LabelSpec = {
-  cols: number; // labels per row
-  rows: number; // rows per page
-  marginX: number; // left/right margin mm
-  marginY: number; // top/bottom margin mm
-  gapX: number; // horizontal gap between labels mm
-  gapY: number; // vertical gap mm
-  labelW: number; // label width mm
-  labelH: number; // label height mm
-};
-
-// Default A4 3x10 (Avery L7158-like): 3 columns x 10 rows, approx sizes
-const DEFAULT_SPEC: LabelSpec = {
-  cols: 3,
-  rows: 10,
-  marginX: 7, // mm
-  marginY: 15, // mm
-  gapX: 2, // mm
-  gapY: 0, // mm
-  labelW: 63, // mm
-  labelH: 25.4, // mm
-};
+// No A4 export; printing uses a dedicated route
 
 export default function BarcodeGeneratorPage() {
   const { user, role, loading } = useAuth();
@@ -85,86 +63,22 @@ export default function BarcodeGeneratorPage() {
   const selected = useMemo(() => products.find((p) => p.id === productId), [products, productId]);
 
   useEffect(() => {
-    // Draw preview for first label
+    // Draw preview for a single horizontal barcode
     if (!selected) return;
     const code = encodeBarcode(selected, categories);
     const canvas = canvasRef.current;
     if (!canvas) return;
     try {
-      // Preview without the human-readable text to reflect PDF layout
-      JsBarcode(canvas, code, { format: "CODE128", displayValue: false, margin: 6, height: 36 });
+      JsBarcode(canvas, code, { format: "CODE128", displayValue: false, margin: 4, height: 36 });
     } catch (e) {
       console.error("Barcode render failed", e);
     }
   }, [selected, qty]);
-
-  async function exportPdf() {
+  function printLabels() {
     if (!selected) return;
-    setBusy(true);
-    try {
-      const spec = DEFAULT_SPEC;
-      const doc = new jsPDF({ unit: "mm", format: "a4" });
-      const code = encodeBarcode(selected, categories);
-
-      // Pre-render barcode to canvas to get image data
-      const tempCanvas = document.createElement("canvas");
-      // For PDF, render bars only (no human-readable text) to avoid duplication
-      JsBarcode(tempCanvas, code, { format: "CODE128", displayValue: false, margin: 0, height: 28 });
-      const imgData = tempCanvas.toDataURL("image/png");
-
-      // Consistent inner horizontal padding (mm) within each label
-      const PAD_X = 4; // left/right padding inside label
-
-      const labelPerPage = spec.cols * spec.rows;
-      const total = Math.max(1, Math.min(300, Math.floor(qty)));
-      for (let i = 0; i < total; i++) {
-        const indexOnPage = i % labelPerPage;
-        if (i > 0 && indexOnPage === 0) doc.addPage();
-
-        const row = Math.floor(indexOnPage / spec.cols);
-        const col = indexOnPage % spec.cols;
-
-        const x = spec.marginX + col * (spec.labelW + spec.gapX);
-        const y = spec.marginY + row * (spec.labelH + spec.gapY);
-
-        // Text: product name (truncate) aligned with barcode inner padding
-        doc.setFontSize(9);
-        const name = selected.name.length > 28 ? selected.name.slice(0, 25) + "…" : selected.name;
-        doc.text(name, x + PAD_X, y + 5, { maxWidth: spec.labelW - PAD_X * 2 });
-
-        // Barcode image with fixed inner padding and reduced width to keep spacing stable
-        const imgW = spec.labelW - PAD_X * 2;
-        const imgH = 12;
-        const imgX = x + PAD_X;
-        const imgY = y + 7;
-        doc.addImage(imgData, "PNG", imgX, imgY, imgW, imgH, undefined, "FAST");
-
-        // Bottom text strictly below the barcode at imgBottom + 6mm for both lines
-        const priceText = `₹${selected.unitPrice.toFixed(2)}`;
-        const textY = imgY + imgH + 6; // desired baseline below barcode
-
-        // Clamp within label height
-        const maxTextY = y + spec.labelH - 2;
-        const adjTextY = Math.min(textY, maxTextY);
-
-        // Price (right aligned) and code (left aligned) on the same baseline using inner paddings
-        doc.setFontSize(7); // slightly smaller to prevent crowding
-        doc.text(priceText, x + spec.labelW - PAD_X, adjTextY, { align: "right" });
-
-        const codeText = code;
-        doc.setFontSize(7);
-        doc.text(codeText, x + PAD_X, adjTextY);
-      }
-
-      doc.save(`barcodes_${selected.sku}_${Date.now()}.pdf`);
-      const count = Math.max(1, Math.min(300, Math.floor(qty)));
-      // Update printed count after successful save
-      if (selected.id) await incrementPrintedCount(selected.id, count);
-    } catch (e) {
-      console.error("PDF export failed", e);
-    } finally {
-      setBusy(false);
-    }
+    const count = Math.max(1, Math.min(300, Math.floor(qty)));
+    // Navigate in the same tab
+    router.push(`/settings/barcodes/print/${selected.id}/${count}`);
   }
 
   return (
@@ -193,21 +107,21 @@ export default function BarcodeGeneratorPage() {
             <Input type="number" min={1} max={300} value={qty} onChange={(e) => setQty(Number(e.target.value))} />
           </div>
           <div className="flex items-end gap-3">
-            <Button onClick={exportPdf} disabled={!selected || busy}>
-              {busy ? "Exporting…" : "Export PDF"}
-            </Button>
+            <Button onClick={printLabels} disabled={!selected || busy}>Print Labels</Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <div className="text-sm font-medium mb-2">Preview</div>
+            <div className="text-sm font-medium mb-2">Preview (50×25 mm, horizontal)</div>
             <div className="border rounded-md p-4 flex flex-col items-center justify-center">
               {selected ? (
                 <>
                   <div className="text-sm mb-2 font-medium truncate max-w-full">{selected.name}</div>
-                  <canvas ref={canvasRef} className="bg-white rounded" />
-                  <div className="text-xs text-muted-foreground mt-2">{encodeBarcode(selected, categories)}</div>
+                  <div style={{ width: '48mm', height: '12mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <canvas ref={canvasRef} className="bg-white rounded" style={{ width: '100%', height: '100%' }} />
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-2">{encodeBarcode(selected, categories)} • ₹{selected.unitPrice.toFixed(2)}</div>
                 </>
               ) : (
                 <div className="text-xs text-muted-foreground">Select a product to preview</div>
@@ -216,7 +130,7 @@ export default function BarcodeGeneratorPage() {
           </div>
           <div>
             <div className="text-sm font-medium mb-2">Layout</div>
-            <div className="text-xs text-muted-foreground">A4 (210×297 mm), 3×10 labels. This can be made configurable later.</div>
+            <div className="text-xs text-muted-foreground">Label size: 50×25 mm. One barcode per label (2×1 inch target) in horizontal orientation. Name on top; code and price below.</div>
           </div>
         </div>
       </Card>
