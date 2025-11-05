@@ -99,7 +99,37 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
   const exRef = doc(collection(dbx, COLLECTIONS.exchanges));
   const refundRef = doc(collection(dbx, COLLECTIONS.refunds));
   const invRef = doc(collection(dbx, COLLECTIONS.invoices));
+    // READ PHASE (all reads before any writes)
+    // Gather stock availability for new items
+    let settingsPrefix = 'INV';
+    let settingsNextSeq = 1;
+    if (newLines.length > 0) {
+      const needByProduct = new Map<string, number>();
+      for (const n of newLines) {
+        needByProduct.set(n.productId, (needByProduct.get(n.productId) || 0) + n.qty);
+      }
+      for (const [pid, need] of needByProduct.entries()) {
+        const pRef = doc(dbx, COLLECTIONS.products, pid);
+        const snap = await (tx as any).get(pRef);
+        if (!snap.exists()) throw new Error(`Product not found: ${pid}`);
+        const data = snap.data() as any;
+        const curr = Number(data?.stock ?? 0) || 0;
+        if (need > curr) {
+          const nm = typeof data?.name === 'string' ? data.name : 'Item';
+          throw new Error(`Insufficient stock for ${nm}. Available: ${curr}, requested: ${need}`);
+        }
+      }
+      // Read settings for invoice numbering
+      const sRef = doc(dbx, COLLECTIONS.settings, 'app');
+      const sSnap = await (tx as any).get(sRef);
+      if (sSnap.exists()) {
+        const s = sSnap.data() as any;
+        settingsPrefix = typeof s.invoicePrefix === 'string' && s.invoicePrefix.trim() ? s.invoicePrefix.trim() : 'INV';
+        settingsNextSeq = Number(s.nextInvoiceSequence ?? 1) || 1;
+      }
+    }
 
+    // WRITE PHASE (no more reads from here)
     // For defect returns, log as damage without stock change here.
     for (const r of returnLines) {
       if (r.defect) {
@@ -117,66 +147,43 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
       }
     }
 
-    // Create exchange doc
-    const exchangePayload: Omit<ExchangeDoc, 'id'|'createdAt'|'updatedAt'> = {
+    // Create exchange doc (omit 'payment' field if not provided to avoid undefined)
+    const maybePayment = difference > 0
+      ? (req.paymentMethod ? { type: 'pay', method: req.paymentMethod, ...(req.paymentReferenceId ? { referenceId: req.paymentReferenceId } : {}) } : null)
+      : (difference < 0 ? (req.refundMethod ? { type: 'refund', method: req.refundMethod, ...(req.refundReferenceId ? { referenceId: req.refundReferenceId } : {}) } : null) : null);
+
+    const exchangeData: any = {
       originalInvoiceId: req.originalInvoiceId,
       returned: returnLines,
       newItems: newLines,
       totals: { returnCredit, newSubtotal, difference },
-      payment: difference > 0 ? (req.paymentMethod ? { type: 'pay', method: req.paymentMethod, referenceId: req.paymentReferenceId } : undefined) : (difference < 0 ? (req.refundMethod ? { type: 'refund', method: req.refundMethod, referenceId: req.refundReferenceId } : undefined) : undefined),
       createdByUserId: req.cashierUserId,
-    } as any;
-  // Idempotency: pass through optional opId in request to allow duplicate guard later
-  tx.set(exRef, { ...exchangePayload, ...(req as any).opId ? { opId: (req as any).opId } : {}, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    };
+    if (maybePayment) exchangeData.payment = maybePayment;
+    if ((req as any).opId) exchangeData.opId = (req as any).opId;
+    exchangeData.createdAt = serverTimestamp();
+    exchangeData.updatedAt = serverTimestamp();
+    tx.set(exRef, exchangeData);
 
     let createdInvoiceId: string | undefined;
     let createdRefundId: string | undefined;
 
-    // Validate stock for new items before creating invoice (atomic within transaction)
-    if (newLines.length > 0) {
-      const needByProduct = new Map<string, number>();
-      for (const n of newLines) {
-        needByProduct.set(n.productId, (needByProduct.get(n.productId) || 0) + n.qty);
-      }
-      for (const [pid, need] of needByProduct.entries()) {
-        const pRef = doc(dbx, COLLECTIONS.products, pid);
-        const snap = await (tx as any).get(pRef);
-        if (!snap.exists()) throw new Error(`Product not found: ${pid}`);
-        const data = snap.data() as any;
-        const curr = Number(data?.stock ?? 0) || 0;
-        if (need > curr) {
-          const nm = typeof data?.name === 'string' ? data.name : 'Item';
-          throw new Error(`Insufficient stock for ${nm}. Available: ${curr}, requested: ${need}`);
-        }
-      }
-    }
-
     // New invoice if there are new items
     if (newLines.length > 0) {
       const itemsForInvoice = newLines.map(n => ({ productId: n.productId, name: pmap.get(n.productId)?.name || '', quantity: n.qty, unitPrice: n.unitPrice, discountAmount: 0 }));
-      // Apply discount up to subtotal
       const discountTotal = Math.max(0, Math.min(returnCredit, newSubtotal));
       const subtotal = newSubtotal;
-      const taxTotal = 0; // keep 0 unless taxRatePct needed; for now tax remains as existing products may have taxRatePct not wired here
+      const taxTotal = 0;
       const grandTotal = Number((subtotal - discountTotal + taxTotal).toFixed(2));
       const nowIso = new Date().toISOString();
 
-      // Sequential invoice number: reuse settings counter like POS checkout
-      // We cannot call tx.get on a ref created with doc(tx as any,...). Use db doc ref directly.
-  const sRef = doc(dbx, COLLECTIONS.settings, 'app');
-      const sSnap = await (tx as any).get(sRef);
-      let prefix = 'INV';
-      let nextSeq = 1;
-      if (sSnap.exists()) {
-        const s = sSnap.data() as any;
-        prefix = typeof s.invoicePrefix === 'string' && s.invoicePrefix.trim() ? s.invoicePrefix.trim() : 'INV';
-        nextSeq = Number(s.nextInvoiceSequence ?? 1) || 1;
-      }
-      const seqStr = String(nextSeq).padStart(6, '0');
-      const invoiceNumber = `${prefix}-${seqStr}`;
-      (tx as any).set(sRef, { invoicePrefix: prefix, nextInvoiceSequence: nextSeq + 1, updatedAt: serverTimestamp() }, { merge: true });
+      // Use settings read above; now bump sequence
+      const sRef = doc(dbx, COLLECTIONS.settings, 'app');
+      const seqStr = String(settingsNextSeq).padStart(6, '0');
+      const invoiceNumber = `${settingsPrefix}-${seqStr}`;
+      (tx as any).set(sRef, { invoicePrefix: settingsPrefix, nextInvoiceSequence: settingsNextSeq + 1, updatedAt: serverTimestamp() }, { merge: true });
 
-  const invDoc: Omit<InvoiceDoc, 'id'> = {
+      const invDoc: Omit<InvoiceDoc, 'id'> = {
         invoiceNumber,
         items: itemsForInvoice,
         subtotal,
@@ -194,9 +201,9 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
         updatedAt: nowIso,
         exchangeOfInvoiceId: req.originalInvoiceId,
         exchangeId: exRef.id,
-    ...(inv.customerId ? { customerId: inv.customerId } : {}),
+        ...(inv.customerId ? { customerId: inv.customerId } : {}),
       } as any;
-  (tx as any).set(invRef, { ...invDoc, ...(req as any).opId ? { opId: (req as any).opId } : {}, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      (tx as any).set(invRef, { ...invDoc, ...(req as any).opId ? { opId: (req as any).opId } : {}, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       createdInvoiceId = invRef.id;
 
       // Decrement stock for new items and write logs
