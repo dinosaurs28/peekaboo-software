@@ -21,8 +21,8 @@ export default function SettingsIndexPage() {
     { key: "receipt", label: "Receipt Template" },
     { key: "categories", label: "Categories" },
     { key: "barcodes", label: "Barcode Generation" },
-  { key: "inventory", label: "Inventory Logs" },
-  { key: "audit", label: "Audit Trail" },
+    { key: "inventory", label: "Inventory Logs" },
+    { key: "audit", label: "Audit Trail" },
     { key: "offers", label: "Offers" },
     { key: "offline", label: "Offline Queue" },
   ];
