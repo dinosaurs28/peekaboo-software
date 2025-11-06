@@ -39,7 +39,7 @@ export function useToast() {
 
 export const Toaster: React.FC<{ toasts: ToastItem[]; onDismiss: (id: number) => void }> = ({ toasts, onDismiss }) => {
   return (
-    <div className="fixed top-3 right-3 z-50 space-y-2 w-[320px] max-w-[calc(100vw-24px)]">
+    <div className="fixed bottom-3 right-3 z-50 space-y-2 w-[320px] max-w-[calc(100vw-24px)]">
       {toasts.map((t) => {
         const color = t.variant === 'destructive' ? 'bg-red-600 text-white'
           : t.variant === 'success' ? 'bg-green-600 text-white'
