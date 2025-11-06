@@ -121,3 +121,47 @@ firebase deploy --only firestore:rules,firestore:indexes
 ---
 
 Questions or changes? Open an issue with the checklist item and desired outcome; we’ll scope it as a polish or a roadmap feature.
+
+
+## Tech Support in the Due course of one month
+1. Offer creation flow perfection
+2. Exchange flow is made more robust. And if return needed is added.
+3. Tax inclusion flow to be perfected.
+4. Receipt template to be made much beautiful and clear. Review link, logo etc to be added.
+5. Reporting to be made much better.
+6. Make sure all buttons have success/error toasts. Converting POS local to use the Global toast provider for consistency. May add few more info toasts in Settings list pages to get extra feedback.
+
+---
+
+## Development tips (Windows)
+
+If you see intermittent ENOENT errors like:
+
+```
+ENOENT: no such file or directory, open '.next\\static\\development\\_buildManifest.js.tmp.*'
+```
+
+This is a known race on some Windows setups when the dev server writes temp files (antivirus/FS latency). We’ve disabled Turbopack by default and enabled Webpack polling to stabilize hot reloads.
+
+Try this:
+
+1) Start dev (Webpack):
+
+```powershell
+npm run dev
+```
+
+2) If it still occurs, clear cache and restart:
+
+```powershell
+npm run clean
+npm run dev
+```
+
+3) Optional: try Turbopack (faster but can trigger the issue):
+
+```powershell
+npm run dev:turbo
+```
+
+We also set watch polling in `next.config.ts` to reduce race conditions on Windows.
