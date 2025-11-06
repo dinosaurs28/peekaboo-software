@@ -128,6 +128,10 @@ export default function InvoiceDetailsPage() {
               <span className="text-muted-foreground">Bill discount</span>
               <span>₹{billLevelDiscount.toFixed(2)}</span>
             </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">GST</span>
+              <span>₹{(invoice?.taxTotal ?? 0).toFixed(2)}</span>
+            </div>
             <div className="flex items-center justify-between text-base font-semibold">
               <span>Grand Total</span>
               <span>₹{invoice?.grandTotal.toFixed(2)}</span>
