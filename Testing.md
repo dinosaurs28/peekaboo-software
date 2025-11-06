@@ -93,11 +93,11 @@ Edge checks
  - [1] Filter by cashier email (not UID) lists invoices for that cashier
 
 ### 8) Exchanges (if enabled)
-- [ ] Return B qty=1 (non‑defect) → confirm → stock +1; InventoryLogs type=return
-- [ ] Second exchange: return only remaining allowable qty (enforced)
-- [ ] Mark return as defect → stock shouldn’t increase; damage/defect logged
+- [1] Return B qty=1 (non‑defect) → confirm → stock +1; InventoryLogs type=return
+- [1] Second exchange: return only remaining allowable qty (enforced)
+- [1] Mark return as defect → stock shouldn’t increase; damage/defect logged
 - [ ] Add A as new item (respects stock); movement logged with reason=exchange
-- [ ] Money handling: if difference > 0 → pay; if < 0 → refund record
+- [1] Money handling: if difference > 0 → pay; if < 0 → refund record
 
 Edge checks
 - [ ] Attempt return beyond remaining qty → blocked
