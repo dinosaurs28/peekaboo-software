@@ -55,7 +55,8 @@ export function toInvoiceDoc(id: string, data: Record<string, unknown>): Invoice
 }
 
 export type InvoiceFilters = {
-  cashierUserId?: string; // when set, filter by cashier
+  cashierUserId?: string; // legacy: filter by cashier uid (still supported)
+  cashierNameEq?: string; // new: filter by cashierName (use email value when captured)
   status?: InvoiceDoc["status"]; // filter by status
   issuedFromIso?: string; // inclusive start
   issuedToIso?: string; // inclusive end
@@ -72,6 +73,7 @@ export function observeInvoices(cb: (invoices: InvoiceDoc[]) => void, filters?: 
   const constraints: QueryConstraint[] = [];
   if (filters?.status) constraints.push(where("status", "==", filters.status));
   if (filters?.cashierUserId) constraints.push(where("cashierUserId", "==", filters.cashierUserId));
+  if (filters?.cashierNameEq) constraints.push(where("cashierName", "==", filters.cashierNameEq));
   if (filters?.issuedFromIso) constraints.push(where("issuedAt", ">=", filters.issuedFromIso));
   if (filters?.issuedToIso) constraints.push(where("issuedAt", "<=", filters.issuedToIso));
   constraints.push(orderBy("issuedAt", "desc"));
@@ -80,6 +82,7 @@ export function observeInvoices(cb: (invoices: InvoiceDoc[]) => void, filters?: 
     let out = list;
     if (filters?.status) out = out.filter((i) => i.status === filters.status);
     if (filters?.cashierUserId) out = out.filter((i) => i.cashierUserId === filters.cashierUserId);
+    if (filters?.cashierNameEq) out = out.filter((i) => (i.cashierName || "") === filters.cashierNameEq);
     if (filters?.issuedFromIso) out = out.filter((i) => i.issuedAt >= filters.issuedFromIso!);
     if (filters?.issuedToIso) out = out.filter((i) => i.issuedAt <= filters.issuedToIso!);
     return out;

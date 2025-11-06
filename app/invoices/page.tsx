@@ -13,7 +13,7 @@ export default function InvoicesPage() {
   const [invoicesLoading, setInvoicesLoading] = useState(true);
   // Admin-only filters
   const [status, setStatus] = useState<InvoiceDoc["status"] | "">("");
-  const [cashier, setCashier] = useState<string>("");
+  const [cashierEmail, setCashierEmail] = useState<string>("");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
 
@@ -25,7 +25,7 @@ export default function InvoicesPage() {
       filters.cashierUserId = user.uid;
     } else {
       if (status) filters.status = status as InvoiceDoc["status"];
-      if (cashier) filters.cashierUserId = cashier;
+      if (cashierEmail) filters.cashierNameEq = cashierEmail.trim();
       if (from) filters.issuedFromIso = new Date(from).toISOString();
       if (to) {
         // Set end of day for inclusive upper bound
@@ -39,7 +39,7 @@ export default function InvoicesPage() {
       setInvoicesLoading(false);
     }, filters);
     return () => unsub();
-  }, [user, role, status, cashier, from, to]);
+  }, [user, role, status, cashierEmail, from, to]);
 
   if (loading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
@@ -85,14 +85,14 @@ export default function InvoicesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-600 block mb-1">Cashier (UID)</label>
-                  <Input placeholder="uid starts-with or full" value={cashier} onChange={(e) => setCashier(e.target.value)} />
+                  <label className="text-xs text-gray-600 block mb-1">Cashier Email</label>
+                  <Input placeholder="e.g., testcashier@peekaboo.com" value={cashierEmail} onChange={(e) => setCashierEmail(e.target.value)} />
                 </div>
               </div>
               <div className="flex justify-end pt-3">
                 <button
                   className="h-9 px-3 rounded-md border text-sm font-medium hover:bg-gray-50"
-                  onClick={() => { setFrom(""); setTo(""); setStatus(""); setCashier(""); }}
+                  onClick={() => { setFrom(""); setTo(""); setStatus(""); setCashierEmail(""); }}
                 >Clear filters</button>
               </div>
             </div>
