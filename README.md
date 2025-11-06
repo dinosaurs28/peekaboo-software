@@ -42,7 +42,7 @@ Essentials to complete and verify before shipping:
 - Optional: pin a SW version bump (`CACHE_VERSION` in `public/sw.js`) for controlled updates.
 
 7) QA and reports
-- Run through Testing.md items (sales, payments, stock, movement, accounting CSV/XLSX).
+- Run through Testing.md items (sales, payments, stock, movement, accounting CSV).
 - Spot‑check Inventory Logs for sale/receive/return/exchange/defect paths.
 
 8) Data hygiene & backups
@@ -95,7 +95,7 @@ Resilience & DX
 - Telemetry & logs: Sentry, performance marks, Cloud logs.
 
 Data & Integrations
-- Bulk import/export for Products/Customers (CSV/XLSX), with validation preview.
+- Bulk import/export for Products/Customers (CSV; XLSX optional later), with validation preview.
 - Payment integrations (UPI intent, card gateways) for reference capture automation.
 - Accounting integrations (Tally/Zoho) via CSV/Bridge API.
 
