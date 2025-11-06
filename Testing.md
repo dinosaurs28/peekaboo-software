@@ -90,6 +90,7 @@ Edge checks
 - [1] Open the recent invoice
 - [1] Click Print Receipt (branding, math correct)
 - [1] Auto‑print dialog opens; GST line and footer reflect Receipt Template settings
+ - [1] Filter by cashier email (not UID) lists invoices for that cashier
 
 ### 8) Exchanges (if enabled)
 - [ ] Return B qty=1 (non‑defect) → confirm → stock +1; InventoryLogs type=return
@@ -166,22 +167,6 @@ Edge checks
 ## Fast Exit Criteria
 
 - [ ] Cashier: cannot oversell; prints correct 80mm receipt; exchanges behave; offline queue safe
-- [ ] Admin: can set branding, print labels (105×70 mm, 2 barcodes/label), sees audit entries, and data reconciles across Reports/Logs
+- [ ] Admin: can set branding, print labels (50×25 mm, 1 barcode/label), sees audit entries, and data reconciles across Reports/Logs
 
 ## FIXES
-After every save or button that the user hits on the web app, a success or error toast should be displayed on the botto right.
-
-Make sure for every confirmation buttons like Save, Checkout, Create etc this toast is added. Checkout its already added, do for others.
-
-Make sure the offers tab in Settings also accessible only for admin and not to cashier.
-
-The tax is applied when we print the receipts. But during the billing flow and when the invoice details are checked the tax is not included. So make sure that the tax is included in billing, invoices page too. And not just in the receipt.
-
-New customer the textboxes should be blank, and not have previous entered customer details.
-
-When the user hits checkout button the print receipt should open and print it. Also give an option to not print, in the print window that appears.
-
-When viewing invoice instead of customer id, make sure the customer name is fetched and displayed in the invoice details.
-
-The exchange increases the stock qty, but it doesnt tell the repayable amount to customer if exchanged item price is less than the returned one. Make sure the money handling is very robust.
-
