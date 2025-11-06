@@ -79,9 +79,15 @@ export default function BarcodeGeneratorPage() {
   function printLabels() {
     if (!selected) return;
     const count = Math.max(1, Math.min(300, Math.floor(qty)));
-    // Navigate in the same tab
+    // Open in a new tab so it can auto-close after printing
     toast({ title: 'Sending to print…', description: `${count} label(s) for ${selected.name}`, variant: 'info', duration: 2000 });
-    router.push(`/settings/barcodes/print/${selected.id}/${count}`);
+    try {
+      const url = `/settings/barcodes/print/${selected.id}/${count}`;
+      window.open(url, '_blank', 'noopener');
+    } catch {
+      // Fallback to same-tab navigation if popups are blocked
+      router.push(`/settings/barcodes/print/${selected.id}/${count}`);
+    }
   }
 
   return (

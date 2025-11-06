@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import JsBarcode from "jsbarcode";
 import { getProduct } from "@/lib/products";
@@ -37,6 +37,7 @@ export default function PrintLabelsPage() {
   const [prod, setProd] = React.useState<ProductDoc | null>(null);
   const [categories, setCategories] = React.useState<CategoryDoc[]>([]);
   const svgRefs = React.useRef<Array<SVGSVGElement | null>>([]);
+  const [barcodesReady, setBarcodesReady] = useState(false);
 
   const handledRef = useRef(false);
   useEffect(() => {
@@ -54,18 +55,37 @@ export default function PrintLabelsPage() {
     // Render barcodes into all label slots once data is ready
     if (!codeText) return;
     const opts = { format: "CODE128", displayValue: false, margin: 0, height: 80 } as const;
-    svgRefs.current.forEach((el) => { if (el) JsBarcode(el, codeText, opts as any); });
+    let drawn = 0;
+    svgRefs.current.forEach((el) => { if (el) { JsBarcode(el, codeText, opts as any); drawn++; } });
+    // Mark ready when we drew at least one barcode and have expected elements
+    if (drawn > 0) {
+      // wait a frame to ensure layout updated
+      requestAnimationFrame(() => setBarcodesReady(true));
+    }
   }, [codeText, labelsCount]);
 
   useEffect(() => {
-    // Prepare page CSS and trigger print
+    // Prepare page CSS to scope printing ONLY to our labels root and page size
     const style = document.createElement('style');
-    // Each label is one physical page sized 50mm × 25mm
-    style.innerHTML = `@media print { @page { size: 50mm 25mm; margin: 0; } }`;
+    style.innerHTML = `
+      @media print {
+        @page { size: 50.8mm 25.4mm; margin: 0; }
+        html, body { width: 50.8mm; height: 25.4mm; margin: 0; padding: 0; }
+        /* Hide everything except our print root */
+        body * { visibility: hidden !important; }
+        #labels-print-root, #labels-print-root * { visibility: visible !important; }
+        /* Ensure our root occupies the page area */
+        #labels-print-root { position: absolute; inset: 0; margin: 0; padding: 0; }
+      }
+      #labels-print-root { background: #fff; }
+    `;
     document.head.appendChild(style);
 
-    // Trigger print after a tick
-    const t = setTimeout(() => window.print(), 300);
+    // Temporarily set a minimal title to avoid big headers if headers/footers are enabled
+    const prevTitle = document.title;
+    document.title = " ";
+    // Trigger print only when barcodes are ready
+    const t = setTimeout(() => { if (barcodesReady) window.print(); }, 300);
 
     const handleAfterPrint = async () => {
       if (handledRef.current) return; // guard against duplicate events
@@ -84,12 +104,15 @@ export default function PrintLabelsPage() {
           toast({ title: 'No changes applied', description: 'Printing was cancelled', variant: 'info' });
         }
       } finally {
+        // Attempt to auto-close this tab (works if opened via window.open)
+        try { window.close(); } catch { /* ignore */ }
+        // Fallback navigation if window couldn't close itself
         router.replace('/settings');
       }
     };
     window.addEventListener('afterprint', handleAfterPrint);
-    return () => { clearTimeout(t); window.removeEventListener('afterprint', handleAfterPrint); document.head.removeChild(style); };
-  }, [labelsCount, prod?.id, router, user?.uid]);
+    return () => { document.title = prevTitle; clearTimeout(t); window.removeEventListener('afterprint', handleAfterPrint); document.head.removeChild(style); };
+  }, [labelsCount, prod?.id, router, user?.uid, barcodesReady]);
 
   if (!prod) return <div className="p-6 text-sm">Preparing labels…</div>;
 
@@ -97,14 +120,14 @@ export default function PrintLabelsPage() {
   const labels = Array.from({ length: labelsCount });
 
   return (
-    <div>
+    <div id="labels-print-root">
       {labels.map((_, idx) => (
         <div
           key={idx}
           className="mx-auto"
           style={{
-            width: '50mm',
-            height: '25mm',
+            width: '50.8mm',
+            height: '25.4mm',
             padding: '1mm',
             boxSizing: 'border-box',
             pageBreakAfter: 'always',
@@ -119,7 +142,7 @@ export default function PrintLabelsPage() {
             {prod.name}
           </div>
           {/* Middle: Horizontal barcode (target ~2"×1") */}
-          <div style={{ width: '48mm', height: '12mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '48.8mm', height: '12.7mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg ref={(el) => { svgRefs.current[idx] = el; }} style={{ width: '100%', height: '100%' }} />
           </div>
           {/* Bottom: Code and price stacked */}
