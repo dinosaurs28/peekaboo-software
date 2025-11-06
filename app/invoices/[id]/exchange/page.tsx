@@ -121,17 +121,42 @@ export default function ExchangePage() {
   }
   function removeNew(pid: string) { setNewLines(prev => prev.filter(n => n.productId !== pid)); }
 
-  const returnCredit = useMemo(() => 0 /* computed server-side precisely */, []);
+  // Client-side preview to guide cashier; server remains source of truth
   const newSubtotal = useMemo(() => newLines.reduce((s, n) => s + n.unitPrice * n.qty, 0), [newLines]);
+  const returnCredit = useMemo(() => {
+    if (!inv) return 0;
+    const originalBase = inv.items.reduce((s, it) => s + it.unitPrice * it.quantity, 0) || 1;
+    const totalLineDisc = inv.items.reduce((s, it) => s + (Number(it.discountAmount || 0)), 0);
+    const billDiscRemaining = Math.max(0, Number(inv.discountTotal || 0) - totalLineDisc);
+    const byPid = new Map<string, { qty: number; unitPrice: number; lineDisc: number }>();
+    for (const it of inv.items) {
+      const prev = byPid.get(it.productId) || { qty: 0, unitPrice: it.unitPrice, lineDisc: 0 };
+      byPid.set(it.productId, { qty: prev.qty + it.quantity, unitPrice: it.unitPrice, lineDisc: prev.lineDisc + (Number(it.discountAmount || 0)) });
+    }
+    let credit = 0;
+    for (const r of returns) {
+      if (!(r.qty > 0)) continue;
+      const src = byPid.get(r.productId);
+      if (!src || src.qty <= 0) continue;
+      const lineBaseTotal = src.unitPrice * src.qty;
+      const proportionalOnLine = billDiscRemaining * (lineBaseTotal / originalBase);
+      const proportionalPerUnit = proportionalOnLine / src.qty;
+      const lineDiscPerUnit = (src.lineDisc || 0) / src.qty;
+      const creditPerUnit = Math.max(0, src.unitPrice - lineDiscPerUnit - proportionalPerUnit);
+      credit += creditPerUnit * r.qty;
+    }
+    return Math.round(credit * 100) / 100;
+  }, [inv, returns]);
+  const diffPreview = useMemo(() => Math.round((newSubtotal - returnCredit) * 100) / 100, [newSubtotal, returnCredit]);
 
   async function submitExchange() {
     if (!inv || !user) return;
     const returned = returns.filter(r => r.qty > 0).map(r => ({ productId: r.productId, qty: r.qty, defect: r.defect }));
-    if (returned.length === 0 && newLines.length === 0) { toast({ title: 'Nothing to exchange', variant: 'warning' }); return; }
+    if (newLines.length === 0) { toast({ title: 'Add item to buy', description: 'Add at least one product to buy in this exchange.', variant: 'destructive' }); return; }
     setBusy(true);
     try {
-      // Choose methods based on rough difference sign from client subtotal; server will compute exact
-      const diffRough = newSubtotal - 0; // return credit unknown here
+      // Choose methods based on preview diff; server will compute exact
+      const diffRough = diffPreview;
       if (!navigator.onLine) {
         try {
           const id = `op-ex-${Date.now()}`;
@@ -162,8 +187,14 @@ export default function ExchangePage() {
           refundMethod: diffRough < 0 ? 'cash' : undefined,
           opId: `op-ex-${Date.now()}`,
         });
-        toast({ title: 'Exchange completed', description: res.newInvoiceId ? `Invoice ${res.newInvoiceId}` : (res.refundId ? `Refund ${res.refundId}` : ''), variant: 'success' });
-        router.push(`/invoices/${res.newInvoiceId || inv.id}`);
+        if (res.difference > 0) {
+          toast({ title: 'Collect from customer', description: `₹${res.difference.toFixed(2)}`, variant: 'success' });
+        } else if (res.difference < 0) {
+          toast({ title: 'Refund to customer', description: `₹${Math.abs(res.difference).toFixed(2)}`, variant: 'success' });
+        } else {
+          toast({ title: 'No balance due', variant: 'success' });
+        }
+        router.push(`/invoices/${res.newInvoiceId}`);
       }
     } catch (e) {
       toast({ title: 'Exchange failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
@@ -249,10 +280,16 @@ export default function ExchangePage() {
       </div>
 
       <div className="border rounded-md p-4 flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">New items subtotal: ₹{newSubtotal.toFixed(2)}. Return credit is computed at confirm.</div>
+        <div className="text-sm text-muted-foreground">
+          <div>New items subtotal: ₹{newSubtotal.toFixed(2)}</div>
+          <div>Estimated return credit: ₹{returnCredit.toFixed(2)}</div>
+          {diffPreview > 0 && <div className="text-green-700">Collect from customer: ₹{diffPreview.toFixed(2)}</div>}
+          {diffPreview < 0 && <div className="text-red-700">Refund to customer: ₹{Math.abs(diffPreview).toFixed(2)}</div>}
+          {diffPreview === 0 && <div>No balance due</div>}
+        </div>
         <div className="flex gap-2">
           <button className="h-9 px-3 rounded border" onClick={() => router.back()} disabled={busy}>Cancel</button>
-          <button className="h-9 px-4 rounded bg-blue-600 text-white disabled:opacity-50" onClick={submitExchange} disabled={busy}>Confirm Exchange</button>
+          <button className="h-9 px-4 rounded bg-blue-600 text-white disabled:opacity-50" onClick={submitExchange} disabled={busy || newLines.length === 0}>Confirm Exchange</button>
         </div>
       </div>
     </div>
