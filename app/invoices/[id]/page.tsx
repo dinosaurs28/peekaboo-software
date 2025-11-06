@@ -10,6 +10,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getCustomer } from "@/lib/customers";
 
 export default function InvoiceDetailsPage() {
   const { user, role, loading } = useAuth();
@@ -17,6 +18,7 @@ export default function InvoiceDetailsPage() {
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
   const [invoice, setInvoice] = useState<InvoiceDoc | null>(null);
   const [pending, setPending] = useState(true);
+  const [customerName, setCustomerName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!db || !id) return;
@@ -31,6 +33,22 @@ export default function InvoiceDetailsPage() {
     });
     return () => unsub();
   }, [id]);
+
+  // Load customer name for display instead of raw ID
+  useEffect(() => {
+    (async () => {
+      try {
+        if (invoice?.customerId) {
+          const c = await getCustomer(invoice.customerId);
+          setCustomerName(c?.name || null);
+        } else {
+          setCustomerName(null);
+        }
+      } catch {
+        setCustomerName(null);
+      }
+    })();
+  }, [invoice?.customerId]);
 
   const billLevelDiscount = useMemo(() => invoice?.discountTotal ?? 0, [invoice]);
   const itemsWithNet = useMemo(() => {
@@ -87,7 +105,9 @@ export default function InvoiceDetailsPage() {
               <div className="space-y-2">
                 <div className="text-sm text-muted-foreground">Issued: {new Date(invoice.issuedAt).toLocaleString()}</div>
                 <div className="text-sm">Cashier: {invoice.cashierName || invoice.cashierUserId}</div>
-                {invoice.customerId && <div className="text-sm">Customer: {invoice.customerId}</div>}
+                {invoice.customerId && (
+                  <div className="text-sm">Customer: {customerName || invoice.customerId}</div>
+                )}
                 <div className="text-sm">Payment: {invoice.paymentMethod.toUpperCase()}{invoice.paymentReferenceId ? ` • ${invoice.paymentReferenceId}` : ''}</div>
               </div>
             )}
