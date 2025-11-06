@@ -40,6 +40,7 @@ export function PosPanel() {
   const [custKidsDob, setCustKidsDob] = useState("");
   const [custFound, setCustFound] = useState<{ id: string; name: string; points?: number } | null>(null);
   const [custChecking, setCustChecking] = useState(false);
+  const phoneLookupSeq = useRef(0);
   const [busy, setBusy] = useState(false);
   // UI-only: GST fields (no backend changes)
   const [gstin, setGstin] = useState("");
@@ -531,6 +532,10 @@ export function PosPanel() {
     const phone = custPhone.trim();
     if (!phone) {
       setCustFound(null);
+      // Ensure new customer fields are blank when no phone is provided
+      setCustName("");
+      setCustEmail("");
+      setCustKidsDob("");
       return;
     }
     try {
@@ -542,11 +547,11 @@ export function PosPanel() {
         setCustEmail(c.email || "");
         setCustKidsDob(c.kidsDob || "");
       } else {
+        // Not found: treat as new customer — always start with blank fields
         setCustFound(null);
-        // keep entered values (if any), otherwise clear name for clarity
-        if (!custName) setCustName("");
-        if (!custEmail) setCustEmail("");
-        if (!custKidsDob) setCustKidsDob("");
+        setCustName("");
+        setCustEmail("");
+        setCustKidsDob("");
       }
     } catch {
       // ignore lookup errors for now but notify
@@ -555,6 +560,42 @@ export function PosPanel() {
       setCustChecking(false);
     }
   }
+
+  // Auto-lookup on phone change with debounce and optimistic clear
+  useEffect(() => {
+    const phone = custPhone.trim();
+    // Optimistically clear fields so old data isn't shown for a new phone
+    setCustFound(null);
+    setCustName("");
+    setCustEmail("");
+    setCustKidsDob("");
+    if (!phone) return;
+    const seq = ++phoneLookupSeq.current;
+    const t = setTimeout(async () => {
+      try {
+        setCustChecking(true);
+        const c = await findCustomerByPhone(phone);
+        // Ignore if a newer lookup started
+        if (phoneLookupSeq.current !== seq) return;
+        if (c) {
+          setCustFound({ id: c.id!, name: c.name, points: Math.max(0, Number(c.loyaltyPoints || 0)) });
+          setCustName(c.name || "");
+          setCustEmail(c.email || "");
+          setCustKidsDob(c.kidsDob || "");
+        } else {
+          setCustFound(null);
+          setCustName("");
+          setCustEmail("");
+          setCustKidsDob("");
+        }
+      } catch {
+        // ignore errors; keep fields blank for new customer
+      } finally {
+        if (phoneLookupSeq.current === seq) setCustChecking(false);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [custPhone]);
 
   async function onCheckout() {
     if (cart.length === 0) return;
