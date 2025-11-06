@@ -22,9 +22,9 @@ Admin (≈4 minutes)
 - [ ] Receipt Template: tweak 80mm options (GST line, footer) → print any invoice again
 	- Expect: Receipt reflects settings
 - [ ] Barcode print: Settings → Barcodes → choose a product, set labels=2 → Print Labels
-	- Expect: Same tab 50×25 mm; 1 barcode per label, horizontal; after print, the app asks “Did the labels print successfully?”
+	- Expect: Opens in a new tab; only labels are printed (page is 50×25 mm per label), 1 barcode per label, horizontal; after print, the app asks “Did the labels print successfully?” and auto‑closes the tab
 	- If Yes: stock +2 (labels); Printed count +2; Audit Trail entry (type=purchase, reason=receive, note=barcode-print)
-	- If No: no stock/printed count change; return to Settings
+	- If No: no stock/printed count change; returns to Settings
 
 ---
 
