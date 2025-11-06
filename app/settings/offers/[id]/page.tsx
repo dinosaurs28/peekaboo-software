@@ -10,6 +10,8 @@ import type { ProductDoc, OfferDoc } from "@/lib/models";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { COLLECTIONS } from "@/lib/models";
+import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export default function EditOfferPage() {
   const params = useParams();
@@ -29,6 +31,8 @@ export default function EditOfferPage() {
   const [categories, setCategories] = useState<CategoryDoc[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { user, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
     Promise.all([listProducts(), listCategories()])
@@ -82,10 +86,12 @@ export default function EditOfferPage() {
     try {
       setSaving(true);
       await updateOffer(id, { name: name.trim(), description: description.trim() || undefined, active, startsAt: startsAt || undefined, endsAt: endsAt || undefined, discountType: discountType || undefined, discountValue: discountType ? Number(discountValue) : undefined, productIds: selectedProducts, categoryNames: selectedCategories, ruleType, buyQty: ruleType === 'bogoSameItem' ? Number(buyQty || 0) : undefined, getQty: ruleType === 'bogoSameItem' ? Number(getQty || 0) : undefined, dobMonthOnly, eventName: eventName || undefined, priority: Number(priority || 0), exclusive });
+      toast({ title: 'Offer updated', description: name.trim(), variant: 'success' });
       router.push('/settings/offers');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
+      toast({ title: 'Save failed', description: msg, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -95,6 +101,8 @@ export default function EditOfferPage() {
     setSelectedProducts((prev) => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
 
+  if (authLoading) return <div className="p-4">Loading…</div>;
+  if (!user || role !== 'admin') return <div className="p-4 text-sm text-muted-foreground">Admin access required.</div>;
   if (!offer) return <div className="p-4">Loading…</div>;
 
   return (

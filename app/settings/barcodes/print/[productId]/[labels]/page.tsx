@@ -9,6 +9,7 @@ import type { CategoryDoc, ProductDoc } from "@/lib/models";
 import { incrementPrintedCount } from "@/lib/products";
 import { adjustStock } from "@/lib/pos";
 import { useAuth } from "@/components/auth/auth-provider";
+import { useToast } from "@/components/ui/toast";
 
 function encodeBarcode(p: ProductDoc, categories: CategoryDoc[]): string {
   const catName = p.category;
@@ -24,6 +25,7 @@ export default function PrintLabelsPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { toast } = useToast();
   const productId = Array.isArray(params?.productId) ? params.productId[0] : (params?.productId as string);
   const labelsCount = useMemo(() => {
     const raw = Array.isArray(params?.labels) ? params.labels[0] : (params?.labels as string);
@@ -77,6 +79,9 @@ export default function PrintLabelsPage() {
           const totalBarcodes = labelsCount; // one barcode per label
           await incrementPrintedCount(prod.id, totalBarcodes);
           await adjustStock({ productId: prod.id, delta: totalBarcodes, reason: 'receive', userId: user?.uid, note: 'barcode-print' });
+          toast({ title: 'Stock updated', description: `${totalBarcodes} added for printing`, variant: 'success' });
+        } else {
+          toast({ title: 'No changes applied', description: 'Printing was cancelled', variant: 'info' });
         }
       } finally {
         router.replace('/settings');

@@ -9,7 +9,7 @@ import dynamic from "next/dynamic";
 import { useState, useMemo } from "react";
 
 export default function SettingsIndexPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
   const router = useRouter();
   type TabKey = "store" | "receipt" | "categories" | "barcodes" | "inventory" | "offers" | "offline" | "audit";
   const [tab, setTab] = useState<TabKey>("store");
@@ -23,7 +23,8 @@ export default function SettingsIndexPage() {
     { key: "barcodes", label: "Barcode Generation" },
     { key: "inventory", label: "Inventory Logs" },
     { key: "audit", label: "Audit Trail" },
-    { key: "offers", label: "Offers" },
+    // Offers is admin-only per policy
+    ...(role === 'admin' ? [{ key: "offers", label: "Offers" } as const] : []),
     { key: "offline", label: "Offline Queue" },
   ];
 

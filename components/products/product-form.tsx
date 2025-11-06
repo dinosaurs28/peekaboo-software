@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { createProduct, updateProduct, UpsertProductInput } from "@/lib/products";
 import { listCategories } from "@/lib/categories";
 import type { CategoryDoc } from "@/lib/models";
+import { useToast } from "@/components/ui/toast";
 
 export interface ProductFormProps {
   mode: "create" | "edit";
@@ -28,6 +29,7 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryDoc[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     let mounted = true;
@@ -47,13 +49,17 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
       if (!form.name || !form.sku) throw new Error("Name and SKU are required");
       if (mode === "create") {
         const id = await createProduct(form);
+        toast({ title: 'Product created', description: form.name, variant: 'success' });
         onSaved?.(id);
       } else if (mode === "edit" && initial?.id) {
         await updateProduct(initial.id, form);
+        toast({ title: 'Product updated', description: form.name, variant: 'success' });
         onSaved?.(initial.id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: 'Save failed', description: msg, variant: 'destructive' });
     } finally {
       setSaving(false);
     }

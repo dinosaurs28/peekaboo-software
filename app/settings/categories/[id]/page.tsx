@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getCategory, updateCategory } from "@/lib/categories";
 import { useParams } from "next/navigation";
+import { useToast } from "@/components/ui/toast";
 
 export default function EditCategoryPage() {
   const { user, role, loading } = useAuth();
@@ -15,17 +16,20 @@ export default function EditCategoryPage() {
   const [description, setDescription] = useState("");
   const [active, setActive] = useState(true);
   const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
   useEffect(() => { if (id) { getCategory(id).then(c => { if (c) { setName(c.name); setCode(c.code); setDescription(c.description || ""); setActive(!!c.active); } }); } }, [id]);
   if (loading) return <div className="p-6">Loading…</div>;
   if (!user || role !== 'admin') return <div className="p-6 text-sm text-muted-foreground">Admin access required.</div>;
   async function onSave() {
-    if (!name || !code) { alert('Name and Code required'); return; }
+    if (!name || !code) { toast({ title: 'Validation', description: 'Name and Code are required', variant: 'destructive' }); return; }
     setBusy(true);
     try {
       await updateCategory(id!, { name, code, description: description || undefined, active });
+      toast({ title: 'Category updated', description: `${name} (${code})`, variant: 'success' });
       window.location.href = "/settings/categories";
     } catch (e) {
-      alert(String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ title: 'Save failed', description: msg, variant: 'destructive' });
     } finally { setBusy(false); }
   }
   return (

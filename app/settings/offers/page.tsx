@@ -3,14 +3,21 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { listOffers } from "@/lib/offers";
 import type { OfferDoc } from "@/lib/models";
+import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export default function OffersListPage() {
   const [offers, setOffers] = useState<OfferDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const { toast } = useToast();
+  const { user, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    listOffers().then(setOffers).finally(() => setLoading(false));
+    listOffers()
+      .then(setOffers)
+      .catch((e) => toast({ title: 'Load failed', description: String(e), variant: 'destructive' }))
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(() => {
@@ -18,6 +25,9 @@ export default function OffersListPage() {
     if (!s) return offers;
     return offers.filter(o => o.name.toLowerCase().includes(s));
   }, [q, offers]);
+
+  if (authLoading) return <div className="p-4">Loading…</div>;
+  if (!user || role !== 'admin') return <div className="p-4 text-sm text-muted-foreground">Admin access required.</div>;
 
   return (
     <div className="p-4 space-y-4">

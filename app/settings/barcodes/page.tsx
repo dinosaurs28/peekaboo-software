@@ -11,6 +11,7 @@ import type { ProductDoc } from "@/lib/models";
 import { categoryCode } from "@/lib/models";
 import { listCategories } from "@/lib/categories";
 import type { CategoryDoc } from "@/lib/models";
+import { useToast } from "@/components/ui/toast";
 
 // Contract:
 // - Admin only access; others redirected to /login or /dashboard
@@ -40,6 +41,7 @@ export default function BarcodeGeneratorPage() {
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [categories, setCategories] = useState<CategoryDoc[]>([]);
+  const { toast } = useToast();
   // Removed: Add to stock on export (deprecated per testing feedback)
 
   useEffect(() => {
@@ -78,6 +80,7 @@ export default function BarcodeGeneratorPage() {
     if (!selected) return;
     const count = Math.max(1, Math.min(300, Math.floor(qty)));
     // Navigate in the same tab
+    toast({ title: 'Sending to print…', description: `${count} label(s) for ${selected.name}`, variant: 'info', duration: 2000 });
     router.push(`/settings/barcodes/print/${selected.id}/${count}`);
   }
 

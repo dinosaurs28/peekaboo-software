@@ -62,6 +62,7 @@ export default function OfflineQueuePage() {
     setBusy(true);
     try {
       await processQueue();
+      toast({ title: 'Queue processed', variant: 'success' });
       await refresh();
     } finally { setBusy(false); }
   }

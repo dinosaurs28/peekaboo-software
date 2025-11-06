@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import type { SettingsDoc } from "@/lib/models";
+import { useToast } from "@/components/ui/toast";
 
 type FormState = Partial<Pick<SettingsDoc,
   | "receiptPaperWidthMm"
@@ -21,6 +22,7 @@ export default function ReceiptTemplateSettingsPage() {
   const isAdmin = role === "admin";
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<FormState>({});
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -64,6 +66,10 @@ export default function ReceiptTemplateSettingsPage() {
         updatedAt: new Date().toISOString(),
       } as any;
       await setDoc(ref, { ...payload, updatedAt: serverTimestamp() }, { merge: true });
+      toast({ title: 'Saved', description: 'Receipt settings updated', variant: 'success' });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ title: 'Save failed', description: msg, variant: 'destructive' });
     } finally {
       setSaving(false);
     }

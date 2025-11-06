@@ -4,6 +4,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createCategory } from "@/lib/categories";
+import { useToast } from "@/components/ui/toast";
 
 export default function NewCategoryPage() {
   const { user, role, loading } = useAuth();
@@ -12,16 +13,19 @@ export default function NewCategoryPage() {
   const [description, setDescription] = useState("");
   const [active, setActive] = useState(true);
   const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
   if (loading) return <div className="p-6">Loading…</div>;
   if (!user || role !== 'admin') return <div className="p-6 text-sm text-muted-foreground">Admin access required.</div>;
   async function onSave() {
-    if (!name || !code) { alert('Name and Code required'); return; }
+    if (!name || !code) { toast({ title: 'Validation', description: 'Name and Code are required', variant: 'destructive' }); return; }
     setBusy(true);
     try {
       await createCategory({ name, code, description: description || undefined, active });
+      toast({ title: 'Category created', description: `${name} (${code})`, variant: 'success' });
       window.location.href = "/settings/categories";
     } catch (e) {
-      alert(String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ title: 'Save failed', description: msg, variant: 'destructive' });
     } finally { setBusy(false); }
   }
   return (
