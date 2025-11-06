@@ -165,3 +165,102 @@ npm run dev:turbo
 ```
 
 We also set watch polling in `next.config.ts` to reduce race conditions on Windows.
+
+---
+
+## Deploy to Vercel (Production)
+
+Follow these steps to deploy this app to your own domain on Vercel.
+
+### 0) Prerequisites
+- Vercel account (Owner/Maintainer on the target team/project)
+- GitHub repository connected (this repo)
+- Firebase project for production
+- Node 20.x on Vercel (Project → Settings → Node.js Version = 20)
+
+### 1) Firebase setup (production)
+- Firebase Console → Authentication → Settings → Authorized domains → add your production domain(s).
+- Ensure Firestore rules and composite indexes are in place (use the existing rules/indexes from this repo or create via console when prompted).
+
+### 2) Environment variables on Vercel
+Project → Settings → Environment Variables → Add (Environment: Production; optionally also Preview)
+
+Required (copy from your local `.env.local`):
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+
+Tip: never commit `.env.local`. Paste values directly in Vercel.
+
+### 3) Build settings (Vercel)
+- Framework Preset: Next.js (auto-detected)
+- Install Command: `npm ci`
+- Build Command: `npm run build`
+- Output Directory: `.next` (default)
+- Node.js Version: `20.x`
+
+### 4) Make print pages dynamic and uncached
+These routes should never be cached, and should not be indexed by search engines.
+
+- In `app/invoices/receipt/[id]/page.tsx` and
+  `app/settings/barcodes/print/[productId]/[labels]/page.tsx` add:
+  - `export const dynamic = "force-dynamic"`
+
+- In `next.config.ts`, add headers for these paths:
+  - `Cache-Control: no-store`
+  - `X-Robots-Tag: noindex, nofollow`
+
+(These guards ensure receipt/label pages always render fresh data and don’t leak into SEO.)
+
+### 5) Local production sanity check (optional but recommended)
+
+```powershell
+npm ci
+npm run build
+npm run start
+```
+
+Open http://localhost:3000 and run the Smoke Test in `Testing.md`.
+
+### 6) Deploy via Vercel dashboard
+- Vercel → New Project → Import this GitHub repo.
+- Confirm Environment Variables and Build Settings (steps 2–3).
+- Deploy and wait for status “Ready”.
+
+### 7) Attach your custom domain
+- Project → Settings → Domains → Add.
+- If using external DNS:
+  - Apex: A → `76.76.21.21`
+  - `www`: CNAME → `cname.vercel-dns.com`
+- Force HTTPS (default) and set preferred redirect (www → apex or apex → www).
+- Add the new domain to Firebase Auth → Authorized domains.
+
+### 8) Post‑deploy verification
+- Auth works (no "domain not authorized" errors)
+- POS: sample sale → receipt tab opens → confirm → tab auto‑closes
+- Barcodes: Settings → Barcodes → Print Labels → only the label prints (2"×1"); confirm → stock increases; audit trail entry present
+- Invoices: filter by cashier email works; totals match receipt
+
+### 9) Printer settings (once per device)
+- In the browser print dialog for labels:
+  - Paper size: 2"×1" (50.8×25.4 mm) or your exact label stock
+  - Margins: None; Scale: 100%
+  - Headers and footers: OFF (removes URL/date/title)
+- Allow pop‑ups for your domain (receipt/label tabs auto‑close).
+
+### Troubleshooting
+- Blank/empty print preview → Allow pop‑ups; ensure we wait for barcode render (built‑in) and pick the correct label paper size
+- Stale receipt/label → Verify `dynamic = "force-dynamic"` and `Cache-Control: no-store` headers
+- Auth fails in prod → Add your domain to Firebase Auth; confirm Vercel env vars
+- Missing Firestore indexes → Create suggested indexes from the Firestore error prompt
+
+### Optional: Vercel CLI
+
+```powershell
+npm i -g vercel
+vercel login
+vercel --prod
+```
