@@ -192,7 +192,8 @@ export default function DashboardPage() {
       <div className="flex flex-col flex-1">
         <Topbar />
         <main className="flex-1 p-8 space-y-6">
-          {role === "cashier" ? (
+          {/* Default any unknown role to cashier UI for safety */}
+          {role !== "admin" ? (
             <PosPanel />
           ) : (
             <>

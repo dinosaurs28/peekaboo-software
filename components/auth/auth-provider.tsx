@@ -31,10 +31,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Ensure user doc exists, then fetch role
           await ensureUserDocument(u);
           const r = await getUserRole(u.uid);
-          setRole(r);
+          // Default conservatively to 'cashier' if role not found to avoid exposing admin UI
+          setRole((r as UserRole | null) || 'cashier');
         } catch (err) {
           console.error("Failed to ensure user document or get role:", err);
-          setRole(null);
+          // On error, restrict UI to cashier capabilities by default
+          setRole('cashier');
         }
       } else {
         setRole(null);

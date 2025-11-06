@@ -59,14 +59,6 @@ export default function MovementReportPage() {
     URL.revokeObjectURL(url);
   }
 
-  async function downloadXlsx() {
-    const data = rows.map(r => ({ Name: r.name, SKU: r.sku, Category: r.category || '', QtyIn: r.qtyIn, QtyOut: r.qtyOut, Net: r.net }));
-    const XLSX = await import('xlsx');
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, 'Movement');
-    XLSX.writeFile(wb, `movement_${from}_${to}_${category || 'all'}.xlsx`);
-  }
 
   if (loading) return <div className="p-6">Loading…</div>;
   if (!user) return null;
@@ -99,9 +91,7 @@ export default function MovementReportPage() {
             <div className="flex items-end">
               <button className="px-3 py-2 rounded-md border bg-background w-full" onClick={downloadCsv} disabled={rows.length === 0}>Export CSV</button>
             </div>
-            <div className="flex items-end">
-              <button className="px-3 py-2 rounded-md border bg-background w-full" onClick={downloadXlsx} disabled={rows.length === 0}>Export XLSX</button>
-            </div>
+
           </div>
 
           <div className="border rounded-md overflow-auto">

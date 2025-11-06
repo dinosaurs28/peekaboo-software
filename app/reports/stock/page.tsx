@@ -51,22 +51,6 @@ export default function StockReportPage() {
     URL.revokeObjectURL(url);
   }
 
-  async function downloadXlsx() {
-    const data = rows.map(p => ({
-      Name: p.name,
-      SKU: p.sku,
-      Category: p.category || '',
-      HSN: p.hsnCode || '',
-      UnitPrice: p.unitPrice,
-      Stock: p.stock,
-      ReorderLevel: p.reorderLevel ?? null,
-    }));
-    const XLSX = await import('xlsx');
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
-    XLSX.writeFile(wb, `stock_${category || 'all'}_${onlyLow ? 'low' : 'all'}.xlsx`);
-  }
 
   if (loading) return <div className="p-6">Loading…</div>;
   if (!user) return null;
@@ -100,9 +84,7 @@ export default function StockReportPage() {
             <div className="flex items-end">
               <button className="px-3 py-2 rounded-md border bg-background w-full" onClick={downloadCsv}>Export CSV</button>
             </div>
-            <div className="flex items-end">
-              <button className="px-3 py-2 rounded-md border bg-background w-full" onClick={downloadXlsx}>Export XLSX</button>
-            </div>
+
           </div>
           <div className="border rounded-md overflow-auto">
             <table className="w-full text-sm">
