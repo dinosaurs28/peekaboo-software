@@ -38,7 +38,6 @@ export default function InvoiceReceiptPage() {
     };
     window.addEventListener('afterprint', onAfterPrint);
     return () => window.removeEventListener('afterprint', onAfterPrint);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
   if (!inv) return <div className="p-4">Preparing…</div>;
@@ -146,3 +145,6 @@ export default function InvoiceReceiptPage() {
     </div>
   );
 }
+
+// Always render fresh and avoid static optimization
+export const dynamic = "force-dynamic";

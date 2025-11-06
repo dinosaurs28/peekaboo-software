@@ -23,7 +23,7 @@ export default function ReportsIndexPage() {
           <div className="max-w-6xl mx-auto space-y-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-              <p className="text-sm text-gray-500 mt-1">Analyze your store's performance with detailed sales and profit/loss reports.</p>
+              <p className="text-sm text-gray-500 mt-1">Analyze your store’s performance with detailed sales and profit/loss reports.</p>
             </div>
 
             {/* Tabbed navigation like Settings; renders inline below */}
@@ -41,7 +41,7 @@ export default function ReportsIndexPage() {
                       type="button"
                       onClick={() => setTab(it.key)}
                       className={`inline-block pb-3 transition-colors ${tab === it.key ? 'text-sky-700 border-b-2 border-sky-600 font-medium' : 'text-sky-600 hover:text-sky-700 border-b-2 border-transparent'}`}
-                      aria-selected={tab === it.key}
+                      aria-pressed={tab === it.key}
                     >
                       {it.label}
                     </button>

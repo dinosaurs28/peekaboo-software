@@ -10,7 +10,7 @@ import type { CustomerDoc, InvoiceDoc } from "@/lib/models";
 import { toInvoiceDoc } from "@/lib/invoices";
 
 export default function CustomerDetailPage() {
-  const { user, loading, role } = useAuth();
+  const { user, loading } = useAuth();
   const p = useParams();
   const id = Array.isArray(p?.id) ? p!.id[0] : (p?.id as string);
   const [cust, setCust] = useState<CustomerDoc | null>(null);

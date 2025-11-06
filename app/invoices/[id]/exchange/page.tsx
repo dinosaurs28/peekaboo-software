@@ -24,7 +24,7 @@ export default function ExchangePage() {
   const [returns, setReturns] = useState<ReturnLineUI[]>([]);
   const [newLines, setNewLines] = useState<NewLineUI[]>([]);
   const [products, setProducts] = useState<ProductDoc[]>([]);
-  const [priorReturned, setPriorReturned] = useState<Map<string, number>>(new Map());
+  // Removed priorReturned state (not used elsewhere)
   const [scanValue, setScanValue] = useState("");
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -66,7 +66,6 @@ export default function ExchangePage() {
           }
         }
       });
-      setPriorReturned(prior);
       // Adjust remaining maxQty in returns based on prior
       setReturns(prev => prev.map(r => {
         const used = prior.get(r.productId) || 0;
@@ -173,7 +172,7 @@ export default function ExchangePage() {
           await (await import("@/lib/offline")).enqueueOp({ id, type: 'exchange', payload, createdAt: new Date().toISOString(), attempts: 0 });
           toast({ title: 'Exchange queued', description: 'Offline: exchange will sync when connected', variant: 'success' });
           router.push(`/invoices/${inv.id}`);
-        } catch (e) {
+        } catch {
           toast({ title: 'Queue failed', description: 'Could not enqueue exchange', variant: 'destructive' });
         }
       } else {

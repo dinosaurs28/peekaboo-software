@@ -18,7 +18,7 @@ export default function OffersListPage() {
       .then(setOffers)
       .catch((e) => toast({ title: 'Load failed', description: String(e), variant: 'destructive' }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();

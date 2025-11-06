@@ -79,7 +79,7 @@ export default function SettingsIndexPage() {
                             ? "text-sky-700 border-b-2 border-sky-600 font-medium"
                             : "text-sky-600 hover:text-sky-700 border-b-2 border-transparent")
                         }
-                        aria-selected={active}
+                        aria-pressed={active}
                       >
                         {it.label}
                       </button>

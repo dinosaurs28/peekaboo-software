@@ -38,7 +38,6 @@ export default function BarcodeGeneratorPage() {
   const [products, setProducts] = useState<ProductDoc[]>([]);
   const [productId, setProductId] = useState<string>("");
   const [qty, setQty] = useState<number>(1);
-  const [busy, setBusy] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [categories, setCategories] = useState<CategoryDoc[]>([]);
   const { toast } = useToast();
@@ -116,7 +115,7 @@ export default function BarcodeGeneratorPage() {
             <Input type="number" min={1} max={300} value={qty} onChange={(e) => setQty(Number(e.target.value))} />
           </div>
           <div className="flex items-end gap-3">
-            <Button onClick={printLabels} disabled={!selected || busy}>Print Labels</Button>
+            <Button onClick={printLabels} disabled={!selected}>Print Labels</Button>
           </div>
         </div>
 

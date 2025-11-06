@@ -1,4 +1,6 @@
 "use client";
+// Always render fresh and avoid static optimization for print labels
+export const dynamic = "force-dynamic";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import JsBarcode from "jsbarcode";

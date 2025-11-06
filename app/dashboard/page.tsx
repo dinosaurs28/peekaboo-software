@@ -4,8 +4,6 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { RecentInvoices } from "@/components/dashboard/recent-invoices";
-import { DollarSign, Users, Wallet } from "lucide-react";
 import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";
 import { PosPanel } from "@/components/pos/pos-panel";
 import { db } from "@/lib/firebase";
@@ -31,8 +29,7 @@ export default function DashboardPage() {
 
   // Dashboard stats (filtered by range)
   const [revenue, setRevenue] = useState(0);
-  const [expenses, setExpenses] = useState(0);
-  const [newCustomers, setNewCustomers] = useState(0);
+  // Removed unused: expenses, newCustomers
   const [costMap, setCostMap] = useState<Record<string, number>>({});
   const [productMeta, setProductMeta] = useState<Record<string, { name: string; category?: string }>>({});
   const [topItems, setTopItems] = useState<Array<{ productId: string; name: string; category?: string; units: number; revenue: number }>>([]);
@@ -101,7 +98,6 @@ export default function DashboardPage() {
     const q = query(col, ...constraints);
     const unsub = onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
       let rev = 0;
-      let exp = 0;
       const agg = new Map<string, { productId: string; name: string; category?: string; units: number; revenue: number }>();
       const dayMap = new Map<string, number>();
       snap.docs.forEach((d) => {
@@ -117,8 +113,7 @@ export default function DashboardPage() {
         items.forEach((it) => {
           const pid = String(it.productId ?? "");
           const qty = typeof it.quantity === 'number' ? it.quantity : Number(it.quantity ?? 0);
-          const cost = costMap[pid] ?? 0;
-          exp += cost * (Number.isFinite(qty) ? qty : 0);
+          // const cost = costMap[pid] ?? 0; // COGS not shown on UI currently
 
           // Aggregate Top Selling Items
           if (pid) {
@@ -138,7 +133,6 @@ export default function DashboardPage() {
         });
       });
       setRevenue(rev);
-      setExpenses(exp);
       const list = Array.from(agg.values()).sort((a, b) => (b.units - a.units) || (b.revenue - a.revenue));
       setTopItems(list);
       // Prepare buckets (limit to last 12 buckets)
@@ -174,16 +168,7 @@ export default function DashboardPage() {
   }, [fromIso, toIso]);
 
   // New customers in selected range by createdAt timestamp
-  useEffect(() => {
-    if (!db) return;
-    const col = collection(db, COLLECTIONS.customers);
-    const constraints: QueryConstraint[] = [];
-    if (customersFromTs) constraints.push(where("createdAt", ">=", customersFromTs));
-    if (customersToTs) constraints.push(where("createdAt", "<=", customersToTs));
-    const q = constraints.length ? query(col, ...constraints) : query(col);
-    const unsub = onSnapshot(q, (snap) => setNewCustomers(snap.size));
-    return () => unsub();
-  }, [customersFromTs, customersToTs]);
+  // Removed new customers stat (unused in UI)
 
   // Subtext helper for stat cards
   const rangeSubtext = useMemo(() => {
