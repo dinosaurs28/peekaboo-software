@@ -23,6 +23,10 @@ export type ExchangeRequest = {
 export async function performExchange(req: ExchangeRequest): Promise<{ exchangeId: string; newInvoiceId?: string; refundId?: string; difference: number }>{
   if (!db) throw new Error("Firestore not initialized");
   const dbx = db!;
+  // Require at least one new item to proceed with an exchange
+  if (!req.newItems || req.newItems.length === 0) {
+    throw new Error("Add at least one product to buy in this exchange.");
+  }
   // Load original invoice and product catalog for pricing
   const invSnap = await getDoc(doc(dbx, COLLECTIONS.invoices, req.originalInvoiceId));
   if (!invSnap.exists()) throw new Error("Original invoice not found");
