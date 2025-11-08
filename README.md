@@ -124,13 +124,17 @@ Questions or changes? Open an issue with the checklist item and desired outcome;
 
 
 ## Tech Support in the Due course of one month
-1. Offer creation flow perfection
-2. Exchange flow is made more robust. And if return needed is added.
-3. Tax inclusion flow to be perfected.
-4. Receipt template to be made much beautiful and clear. Review link, logo etc to be added.
-5. Reporting to be made much better.
-6. Make sure all buttons have success/error toasts. Converting POS local to use the Global toast provider for consistency. May add few more info toasts in Settings list pages to get extra feedback.
+1. This web app should always start with Sign in page. And not dashboard.
+2. Offer creation flow perfection
+3. Exchange flow is made more robust. And if return needed is added.
+4. Tax inclusion flow to be perfected.
+5. Receipt template to be made much beautiful and clear. Should show unit price(base price [ex-tax]) of an item and its GST And line total(MRP). Discounts for now keep it Bill discount only. Review link, logo etc to be added.
+6. Reporting to be made much better.
+7. Products are listed alphabetically.
+8. Make sure all buttons have success/error toasts. Converting POS local to use the Global toast provider for consistency. May add few more info toasts in Settings list pages to get extra feedback.
 
+
+### NEXT 
 ---
 
 ## Development tips (Windows)
