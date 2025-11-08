@@ -11,6 +11,7 @@ import { Topbar } from "@/components/layout/topbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getCustomer } from "@/lib/customers";
+import { splitInclusive } from "@/lib/tax";
 
 export default function InvoiceDetailsPage() {
   const { user, role, loading } = useAuth();
@@ -51,6 +52,17 @@ export default function InvoiceDetailsPage() {
   }, [invoice?.customerId]);
 
   const billLevelDiscount = useMemo(() => invoice?.discountTotal ?? 0, [invoice]);
+  const totalsInclusive = useMemo(() => {
+    if (!invoice) return { base: 0, gst: 0, lineDisc: 0 };
+    let base = 0, gst = 0, lineDisc = 0;
+    for (const it of invoice.items) {
+      const { base: b, gst: g } = splitInclusive(Number(it.unitPrice || 0), Number(it.taxRatePct || 0));
+      base += b * Number(it.quantity || 0);
+      gst += g * Number(it.quantity || 0);
+      lineDisc += Number(it.discountAmount || 0);
+    }
+    return { base, gst, lineDisc };
+  }, [invoice]);
   const itemsWithNet = useMemo(() => {
     if (!invoice) return [] as Array<{ name: string; qty: number; unit: number; discount: number; net: number }>;
     return invoice.items.map((it) => {
@@ -141,16 +153,16 @@ export default function InvoiceDetailsPage() {
           </Card>
           <Card className="p-4 space-y-1">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span>₹{invoice?.subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Bill discount</span>
-              <span>₹{billLevelDiscount.toFixed(2)}</span>
+              <span className="text-muted-foreground">Base (ex-tax)</span>
+              <span>₹{totalsInclusive.base.toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">GST</span>
-              <span>₹{(invoice?.taxTotal ?? 0).toFixed(2)}</span>
+              <span>₹{totalsInclusive.gst.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Discounts</span>
+              <span>₹{(totalsInclusive.lineDisc + billLevelDiscount).toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between text-base font-semibold">
               <span>Grand Total</span>

@@ -6,6 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 import type { InvoiceDoc, SettingsDoc } from "@/lib/models";
 import { toInvoiceDoc } from "@/lib/invoices";
 import Receipt from "@/components/receipt";
+import { splitInclusive, round2 } from "@/lib/tax";
 
 export default function InvoiceReceiptPage() {
   const params = useParams();
@@ -40,6 +41,19 @@ export default function InvoiceReceiptPage() {
     return () => window.removeEventListener('afterprint', onAfterPrint);
   }, [search]);
 
+  // Compute ex-tax base and GST sums from MRP (unitPrice), independent of discounts
+  const sums = React.useMemo(() => {
+    if (!inv) return { base: 0, gst: 0, lineDisc: 0 };
+    let base = 0, gst = 0, lineDisc = 0;
+    for (const it of inv.items) {
+      const { base: b, gst: g } = splitInclusive(Number(it.unitPrice || 0), Number(it.taxRatePct || 0));
+      base += b * Number(it.quantity || 0);
+      gst += g * Number(it.quantity || 0);
+      lineDisc += Number(it.discountAmount || 0);
+    }
+    return { base: round2(base), gst: round2(gst), lineDisc: round2(lineDisc) };
+  }, [inv]);
+
   if (!inv) return <div className="p-4">Preparing…</div>;
 
   const bizName = settings?.businessName || "Your Store Name";
@@ -54,6 +68,7 @@ export default function InvoiceReceiptPage() {
   const showTax = settings?.showTaxLine ?? true;
   const showReview = !!settings?.showReviewLink && !!settings?.googleReviewUrl;
   const reviewUrl = settings?.googleReviewUrl || undefined;
+  const terms = settings?.receiptTermsConditions || undefined;
 
   const shouldConfirm = (search?.get('confirm') === '1' || search?.get('confirm') === 'true');
   return (
@@ -77,7 +92,9 @@ export default function InvoiceReceiptPage() {
         </div>
       )}
       <Receipt
-        widthMm={80}
+        paperWidthMm={settings?.receiptPaperWidthMm ?? 80}
+        contentWidthMm={settings?.receiptContentWidthMm ?? Math.min(75, Number(settings?.receiptPaperWidthMm ?? 80))}
+        safePaddingMm={3}
         logoUrl={logo}
         businessName={bizName}
         addressLines={addrParts}
@@ -86,6 +103,7 @@ export default function InvoiceReceiptPage() {
         showReviewLink={showReview}
         reviewUrl={reviewUrl}
         autoPrint={!shouldConfirm}
+        termsConditions={terms}
       >
         <div className="bill-info">
           <div className="flex items-center justify-between">
@@ -122,19 +140,19 @@ export default function InvoiceReceiptPage() {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={2}>Subtotal</td>
-              <td className="text-right">₹{inv.subtotal.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td colSpan={2}>Discount</td>
-              <td className="text-right">₹{(inv.discountTotal ?? 0).toFixed(2)}</td>
+              <td colSpan={2}>Base (ex-tax)</td>
+              <td className="text-right">₹{sums.base.toFixed(2)}</td>
             </tr>
             {showTax ? (
               <tr>
                 <td colSpan={2}>GST</td>
-                <td className="text-right">₹{(inv.taxTotal ?? 0).toFixed(2)}</td>
+                <td className="text-right">₹{sums.gst.toFixed(2)}</td>
               </tr>
             ) : null}
+            <tr>
+              <td colSpan={2}>Discounts</td>
+              <td className="text-right">₹{(sums.lineDisc + (inv.discountTotal ?? 0)).toFixed(2)}</td>
+            </tr>
             <tr className="total">
               <td colSpan={2}>Total</td>
               <td className="text-right">₹{inv.grandTotal.toFixed(2)}</td>
