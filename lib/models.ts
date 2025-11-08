@@ -164,8 +164,10 @@ export interface SettingsDoc extends BaseDoc {
   email?: string;
   logoUrl?: string; // public URL (optional)
   receiptFooterNote?: string;
+  receiptTermsConditions?: string; // multi-line terms and conditions for receipt
   // Receipt configuration (optional)
   receiptPaperWidthMm?: number; // e.g., 80 (default), 58 later
+  receiptContentWidthMm?: number; // inner content width, e.g., 75 for 80mm paper
   autoPrintReceipt?: boolean; // hint: auto open print after checkout
   showTaxLine?: boolean; // show GST line on receipt totals
   googleReviewUrl?: string; // link to Google review page

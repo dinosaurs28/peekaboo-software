@@ -52,20 +52,33 @@
 }
 
 /* Receipt print styles */
-:root { --receipt-width-mm: 80mm; }
+:root { --receipt-paper-width-mm: 80mm; --receipt-content-width-mm: 80mm; }
+/* Safe horizontal padding inside content to prevent edge clipping */
+:root { --receipt-safe-pad-mm: 0mm; }
 
 @media print {
-  @page { size: var(--receipt-width-mm) auto; margin: 0; }
+  @page { size: var(--receipt-paper-width-mm) auto; margin: 0; }
 }
 
 .receipt {
-  width: var(--receipt-width-mm);
-  padding: 5px;
+  /* Outer element represents the paper width for centering calculations */
+  width: var(--receipt-paper-width-mm);
   margin: 0 auto;
-  text-align: left;
   font-family: "Courier New", monospace;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
+}
+
+/* Inner constrains the actual content width producing equal gutters */
+.receipt-inner {
+  width: var(--receipt-content-width-mm);
+  box-sizing: border-box;
+  padding: 5px 0; /* vertical padding only by default */
+  margin: 0 auto; /* center inside paper */
+  text-align: left;
+  /* Optional safe horizontal padding injected when needed */
+  padding-left: var(--receipt-safe-pad-mm);
+  padding-right: var(--receipt-safe-pad-mm);
 }
 
 .header { text-align: center; }
@@ -85,5 +98,10 @@
 @media print {
   body.receipt-print * { visibility: hidden; }
   body.receipt-print #receipt, body.receipt-print #receipt * { visibility: visible; }
-  body.receipt-print #receipt { position: absolute; left: 0; top: 0; }
+  /* Keep normal flow so margin auto can center the paper */
+  body.receipt-print #receipt {
+    position: static;
+    left: auto; right: auto; top: auto;
+    margin-left: auto; margin-right: auto;
+  }
 }

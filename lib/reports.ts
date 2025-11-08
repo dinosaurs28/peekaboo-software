@@ -78,16 +78,16 @@ export async function buildAccountingCsv(fromIso: string, toIso: string, opts?: 
       if (opts?.category && (!pd || (pd.category || '') !== opts.category)) continue;
       const sku = pd?.sku || '';
       const hsn = pd?.hsnCode || '';
-      // Discount: line discount plus proportional share of bill discount (if known via invoice.discountTotal)
-      const base = it.unitPrice * it.quantity;
-      const lineDisc = Number(it.discountAmount || 0);
-      // Heuristic: distribute remaining discount (invoice.discountTotal - sum lineDisc) by base weight
-      const remaining = Math.max(0, Number(inv.discountTotal || 0) - inv.items.reduce((s, li) => s + Number(li.discountAmount || 0), 0));
-      const totalBase = inv.items.reduce((s, li) => s + li.unitPrice * li.quantity, 0) || 1;
-      const proportional = remaining * (base / totalBase);
-      const discount = lineDisc + proportional;
-      // Tax: if item.taxRatePct exists, compute; else 0
-      const tax = it.taxRatePct ? (base - discount) * (it.taxRatePct / 100) : 0;
+  // Discounts are post-tax: include line discount plus proportional share of bill-level discount, allocated by MRP weight
+  const mrp = it.unitPrice * it.quantity;
+  const lineDisc = Number(it.discountAmount || 0);
+  const remaining = Math.max(0, Number(inv.discountTotal || 0) - inv.items.reduce((s, li) => s + Number(li.discountAmount || 0), 0));
+  const totalMrp = inv.items.reduce((s, li) => s + li.unitPrice * li.quantity, 0) || 1;
+  const proportional = remaining * (mrp / totalMrp);
+  const discount = lineDisc + proportional;
+  // Tax: derived from MRP inclusive split; do NOT reduce by discounts
+  const r = (Number(it.taxRatePct || 0)) / 100;
+  const tax = r > 0 ? (mrp - mrp / (1 + r)) : 0;
       rows.push({
         date: inv.issuedAt,
         invoiceNumber: inv.invoiceNumber,
