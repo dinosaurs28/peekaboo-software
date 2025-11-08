@@ -107,7 +107,7 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
     // Gather stock availability for new items
     let settingsPrefix = 'INV';
     let settingsNextSeq = 1;
-    if (newLines.length > 0) {
+  if (newLines.length > 0) {
       const needByProduct = new Map<string, number>();
       for (const n of newLines) {
         needByProduct.set(n.productId, (needByProduct.get(n.productId) || 0) + n.qty);
@@ -174,7 +174,7 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
 
     // New invoice if there are new items
     if (newLines.length > 0) {
-      const itemsForInvoice = newLines.map(n => ({ productId: n.productId, name: pmap.get(n.productId)?.name || '', quantity: n.qty, unitPrice: n.unitPrice, discountAmount: 0 }));
+      const itemsForInvoice = newLines.map(n => ({ productId: n.productId, name: pmap.get(n.productId)?.name || '', quantity: n.qty, unitPrice: n.unitPrice, taxRatePct: pmap.get(n.productId)?.taxRatePct, discountAmount: 0 }));
       const discountTotal = Math.max(0, Math.min(returnCredit, newSubtotal));
       const subtotal = newSubtotal;
       const taxTotal = 0;
