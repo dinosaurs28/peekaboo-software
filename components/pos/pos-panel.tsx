@@ -208,22 +208,8 @@ export function PosPanel() {
   const subTotal = useMemo(() => cart.reduce((sum, l) => sum + (l.product.unitPrice * l.qty - lineDiscount(l)), 0), [cart, lineDiscount]);
   // Bill-level discount
   const billDiscComputed = useMemo(() => (billDiscountMode === 'amount' ? billDiscount : (subTotal * billDiscount) / 100), [billDiscountMode, billDiscount, subTotal]);
-  // Estimate GST using same math as backend (proportional bill discount per line)
-  const taxTotal = useMemo(() => {
-    if (subTotal <= 0) return 0;
-    const totalBase = Math.max(1, subTotal);
-    let sum = 0;
-    for (const l of cart) {
-      const net = l.product.unitPrice * l.qty - lineDiscount(l);
-      const billShare = billDiscComputed * (net / totalBase);
-      const taxableBase = Math.max(0, net - billShare);
-      const taxRate = typeof l.product.taxRatePct === 'number' ? l.product.taxRatePct : 0;
-      sum += taxableBase * (taxRate / 100);
-    }
-    return sum;
-  }, [cart, lineDiscount, billDiscComputed, subTotal]);
-  // Grand total including GST (matches server)
-  const total = useMemo(() => Math.max(0, subTotal - billDiscComputed + taxTotal), [subTotal, billDiscComputed, taxTotal]);
+  // Grand total (tax-inclusive pricing): sum of MRP minus discounts; do not add tax separately
+  const total = useMemo(() => Math.max(0, subTotal - billDiscComputed), [subTotal, billDiscComputed]);
 
   function isDobMonthMatch(): boolean {
     if (!custKidsDob) return false;
@@ -1009,7 +995,7 @@ export function PosPanel() {
           </details>
         )}
 
-        {/* Grand Total Summary (tax-included total; GST line hidden for now) */}
+        {/* Grand Total Summary (tax-inclusive total; GST is already included in prices) */}
         {cart.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-start justify-between gap-4">
