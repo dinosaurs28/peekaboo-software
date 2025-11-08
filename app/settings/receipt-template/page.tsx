@@ -9,11 +9,13 @@ import { useToast } from "@/components/ui/toast";
 
 type FormState = Partial<Pick<SettingsDoc,
   | "receiptPaperWidthMm"
+  | "receiptContentWidthMm"
   | "autoPrintReceipt"
   | "showTaxLine"
   | "googleReviewUrl"
   | "showReviewLink"
   | "receiptFooterNote"
+  | "receiptTermsConditions"
 >>;
 
 export default function ReceiptTemplateSettingsPage() {
@@ -37,14 +39,16 @@ export default function ReceiptTemplateSettingsPage() {
         const data = snap.data() as Partial<SettingsDoc>;
         setForm({
           receiptPaperWidthMm: data.receiptPaperWidthMm ?? 80,
+          receiptContentWidthMm: data.receiptContentWidthMm ?? Math.min(75, Number(data.receiptPaperWidthMm ?? 80)),
           autoPrintReceipt: data.autoPrintReceipt ?? true,
           showTaxLine: data.showTaxLine ?? true,
           googleReviewUrl: data.googleReviewUrl ?? "",
           showReviewLink: data.showReviewLink ?? false,
           receiptFooterNote: data.receiptFooterNote ?? "",
+          receiptTermsConditions: data.receiptTermsConditions ?? "",
         });
       } else {
-        setForm({ receiptPaperWidthMm: 80, autoPrintReceipt: true, showTaxLine: true, showReviewLink: false });
+        setForm({ receiptPaperWidthMm: 80, receiptContentWidthMm: 75, autoPrintReceipt: true, showTaxLine: true, showReviewLink: false });
       }
     })();
   }, []);
@@ -58,11 +62,16 @@ export default function ReceiptTemplateSettingsPage() {
       const ref = doc(db, "Settings", "app");
       const payload: Partial<SettingsDoc> = {
         receiptPaperWidthMm: Number(form.receiptPaperWidthMm) || 80,
+        receiptContentWidthMm: Math.min(
+          Number(form.receiptPaperWidthMm) || 80,
+          Math.max(40, Number(form.receiptContentWidthMm) || (Number(form.receiptPaperWidthMm) || 80))
+        ),
         autoPrintReceipt: !!form.autoPrintReceipt,
         showTaxLine: !!form.showTaxLine,
         googleReviewUrl: form.googleReviewUrl || "",
         showReviewLink: !!form.showReviewLink,
         receiptFooterNote: form.receiptFooterNote || "",
+        receiptTermsConditions: form.receiptTermsConditions || "",
         updatedAt: new Date().toISOString(),
       } as any;
       await setDoc(ref, { ...payload, updatedAt: serverTimestamp() }, { merge: true });
@@ -97,6 +106,21 @@ export default function ReceiptTemplateSettingsPage() {
           />
         </label>
 
+        <label className="flex flex-col gap-1">
+          <span>Content Width (mm)</span>
+          <input
+            type="number"
+            className="border rounded px-2 py-1"
+            min={40}
+            max={Math.max(40, Number(form.receiptPaperWidthMm || 80))}
+            step={1}
+            value={form.receiptContentWidthMm ?? Math.min(75, Number(form.receiptPaperWidthMm || 80))}
+            onChange={(e) => update("receiptContentWidthMm", Number(e.target.value))}
+            disabled={!isAdmin}
+          />
+          <span className="text-xs text-muted-foreground">Tip: 75mm on 80mm paper gives ~2.5mm gutter each side.</span>
+        </label>
+
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -126,6 +150,18 @@ export default function ReceiptTemplateSettingsPage() {
             disabled={!isAdmin}
             placeholder="Thank you for shopping with us!"
           />
+        </label>
+
+        <label className="flex flex-col gap-1 sm:col-span-2">
+          <span>Terms & Conditions (prints below footer)</span>
+          <textarea
+            className="border rounded px-2 py-1 h-32 resize-y"
+            value={form.receiptTermsConditions || ""}
+            onChange={(e) => update("receiptTermsConditions", e.target.value)}
+            disabled={!isAdmin}
+            placeholder={"e.g. No cash refunds. Exchange within 7 days with bill. Sale items final."}
+          />
+          <span className="text-xs text-muted-foreground">Keep concise; printer will wrap lines. Suggested under 300 chars.</span>
         </label>
 
         <label className="flex flex-col gap-1 sm:col-span-2">
