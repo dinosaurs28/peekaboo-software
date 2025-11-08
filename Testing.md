@@ -170,3 +170,87 @@ Edge checks
 - [ ] Admin: can set branding, print labels (50×25 mm, 1 barcode/label), sees audit entries, and data reconciles across Reports/Logs
 
 ## FIXES
+
+---
+
+## Tax‑inclusive MRP flow – Test Brief
+
+Goal: Verify that product prices are tax‑inclusive (MRP). POS charges MRP directly without adding tax. Receipts split MRP into Base (ex‑tax) and GST, and apply discounts after tax.
+
+Formulas
+- Given unit MRP P and tax rate r% (r = taxPct/100):
+  - Base (ex‑tax) = P / (1 + r)
+  - GST = P − Base
+  - Line Net (before bill discount) = (P × qty) − lineDiscount
+  - Grand Total = sum(Line Net) − billDiscount
+  - Discounts are post‑tax and do NOT change GST; GST is derived from MRP only.
+
+Setup
+1) Create two products:
+	- A: MRP=₹330, tax=5%
+	- B: MRP=₹200, tax=12%
+2) Ensure both have stock ≥ 5 and are active.
+
+Happy path – single item (no discounts)
+1) POS: add A ×1
+2) Expect POS Grand Total = ₹330.00 (no tax added).
+3) Complete Sale; open receipt.
+4) Receipt totals:
+	- Base (ex‑tax) ≈ ₹314.29
+	- GST ≈ ₹15.71
+	- Discounts = ₹0.00
+	- Total = ₹330.00
+
+Line discount
+1) POS: add A ×1; set line discount ₹20; no bill discount.
+2) Expect POS Grand Total = 330 − 20 = ₹310.00.
+3) Receipt totals:
+	- Base ≈ ₹314.29; GST ≈ ₹15.71 (unchanged by discount)
+	- Discounts = ₹20.00
+	- Total = ₹310.00
+
+Bill discount
+1) POS: add A ×1; no line discounts; set bill discount ₹10.
+2) Expect POS Grand Total = 330 − 10 = ₹320.00.
+3) Receipt totals:
+	- Base ≈ ₹314.29; GST ≈ ₹15.71
+	- Discounts = ₹10.00
+	- Total = ₹320.00
+
+Combined discounts
+1) POS: add A ×1; line discount ₹20; bill discount ₹10.
+2) Expect POS Grand Total = 330 − 20 − 10 = ₹300.00.
+3) Receipt totals:
+	- Base ≈ ₹314.29; GST ≈ ₹15.71
+	- Discounts = ₹30.00
+	- Total = ₹300.00
+
+Multiple items, mixed tax
+1) POS: add A ×2 and B ×1; no discounts.
+2) POS Grand Total = 2×330 + 200 = ₹860.00.
+3) Receipt totals:
+	- Base ≈ (2× 330/1.05) + (200/1.12) ≈ ₹(2×314.29) + 178.57 ≈ ₹807.15
+	- GST ≈ 860 − 807.15 ≈ ₹52.85 (or sum of per‑item GST: 2×15.71 + 21.43)
+	- Discounts = ₹0.00
+	- Total = ₹860.00
+
+Rounding expectations
+- Totals are rounded to 2 decimals after summation; Base and GST on the receipt may differ by ±₹0.01 from manual per‑unit rounding.
+
+Exchange/Returns
+1) Create an invoice with A ×2, bill discount ₹20 (no line discounts).
+2) Start exchange: return A ×1 (non‑defect), add B ×1 as new.
+3) Expect return credit equals original net paid per unit for A (MRP minus proportional share of bill discount).
+4) New invoice for B uses its MRP for charges; receipt shows Base/GST derived from MRP.
+5) Difference drives pay/refund; no tax added separately.
+
+Edge cases
+- Zero tax product: Base = MRP, GST = 0; discounts still post‑tax.
+- Missing taxRatePct treated as 0%.
+- Large bill discount cannot exceed subtotal (guarded). If attempted, expect validation error.
+- POS must never display a separate tax line or increase total by tax; totals are MRP − discounts only.
+
+Quick audit points
+- POS Grand Total matches receipt Total for all scenarios above.
+- Receipt shows Base (ex‑tax), GST (from MRP), Discounts (line + bill), and Total.
+- Reports → Accounting CSV: GST column equals sum of MRP‑derived GST; discounts are listed separately and do not reduce GST.
