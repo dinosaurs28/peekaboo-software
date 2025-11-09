@@ -150,7 +150,8 @@ export default function PrintLabelsPage() {
           {/* Bottom: Code and price stacked */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0mm' }}>
             <div style={{ fontSize: '7pt', lineHeight: 1 }}>{codeText}</div>
-            <div style={{ fontSize: '7pt', fontWeight: 500, lineHeight: 1 }}>₹{prod.unitPrice.toFixed(2)}</div>
+            {/* Increased price font size for better readability on small labels */}
+            <div style={{ fontSize: '8.5pt', fontWeight: 600, lineHeight: 1, letterSpacing: '0.2pt' }}>₹{prod.unitPrice.toFixed(2)}</div>
           </div>
         </div>
       ))}
