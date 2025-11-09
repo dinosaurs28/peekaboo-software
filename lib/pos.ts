@@ -40,32 +40,24 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       throw new Error("Invalid bill discount: must be >= 0");
     }
   }
-  // Compute per-line net and proportional bill discount for tax base
-  const lineNets = input.lines.map(l => ({
+  // Compute inclusive totals: Subtotal = sum of (MRP * qty - lineDiscounts)
+  const linesWithNet = input.lines.map(l => ({
     ...l,
     net: l.unitPrice * l.qty - (l.lineDiscount ?? 0),
   }));
-  const subtotal = lineNets.reduce((s, l) => s + l.net, 0);
+  const subtotal = linesWithNet.reduce((s, l) => s + l.net, 0);
   const billDisc = input.billDiscount ?? 0;
   if (billDisc > subtotal) {
     throw new Error("Bill discount cannot exceed subtotal");
   }
-  // Distribute bill discount proportionally across lines for tax computation
-  const totalBase = Math.max(1, subtotal);
-  const linesWithBillShare = lineNets.map(l => ({
-    ...l,
-    billShare: (billDisc * (l.net / totalBase)),
-  }));
-  // Tax per line (if taxRatePct exists on line source), invoice lines here may not carry taxRatePct; caller should embed it in name or we compute 0
-  // Note: We accept optional taxRatePct in a widened shape; we won't change the CheckoutInput type to keep API minimal
-  const linesWithTax = linesWithBillShare.map((l: any) => {
-    const taxableBase = Math.max(0, l.net - l.billShare);
-    const taxRate = typeof l.taxRatePct === 'number' ? l.taxRatePct : 0;
-    const tax = taxableBase * (taxRate / 100);
-    return { ...l, taxRatePct: taxRate, lineTax: tax };
-  });
-  const taxTotal = linesWithTax.reduce((s: number, l: any) => s + l.lineTax, 0);
-  const grandTotal = Math.max(0, subtotal - billDisc + taxTotal);
+  // Tax is derived from MRP (unitPrice) only, not reduced by discounts (post-tax discounts)
+  const taxTotal = input.lines.reduce((s, l) => {
+    const rate = typeof (l as any).taxRatePct === 'number' ? (l as any).taxRatePct : 0;
+    const r = (Number(rate) || 0) / 100;
+    const gstPerUnit = r > 0 ? (l.unitPrice - l.unitPrice / (1 + r)) : 0;
+    return s + gstPerUnit * l.qty;
+  }, 0);
+  const grandTotal = Math.max(0, subtotal - billDisc);
   const method = input.paymentMethod ?? 'cash';
   const refId = input.paymentReferenceId;
   const cashierUserId = input.cashierUserId ?? 'current-user';
@@ -82,8 +74,16 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       qtyByProduct.set(l.productId, prev + l.qty);
     }
 
-    // Prepare invoice reference first to use id in logs
-    const invRef = doc(collection(dbx, COLLECTIONS.invoices));
+    // Prepare invoice reference; support idempotency via provided opId as fixed document ID
+    const invRef = (input.opId && typeof input.opId === 'string')
+      ? doc(dbx, COLLECTIONS.invoices, input.opId)
+      : doc(collection(dbx, COLLECTIONS.invoices));
+
+    // If an invoice with this id already exists, treat as idempotent success and return existing id
+    const existingInvSnap = await tx.get(invRef);
+    if (existingInvSnap.exists()) {
+      return invRef.id;
+    }
 
   // Sequential invoice number (prefix + zero-padded counter) from Settings/app
   const settingsRef = doc(dbx, COLLECTIONS.settings, 'app');
@@ -113,8 +113,8 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
     }
 
     // From this point onwards, only writes
-    // Bump invoice counter
-    tx.set(settingsRef, { invoicePrefix: prefix, nextInvoiceSequence: nextSeq + 1, updatedAt: serverTimestamp() }, { merge: true });
+  // Bump invoice counter
+  tx.set(settingsRef, { invoicePrefix: prefix, nextInvoiceSequence: nextSeq + 1, updatedAt: serverTimestamp() }, { merge: true });
 
     // Decrement stock and create inventory logs per line (after validation)
     for (const l of input.lines) {
@@ -138,10 +138,10 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
     const inv: Omit<InvoiceDoc, 'id'> = {
       invoiceNumber,
       // customerId omitted unless provided
-      items: linesWithTax.map((l: any) => ({ productId: l.productId, name: l.name, quantity: l.qty, unitPrice: l.unitPrice, taxRatePct: l.taxRatePct || undefined, discountAmount: l.lineDiscount ?? 0 })),
+  items: linesWithNet.map((l: any) => ({ productId: l.productId, name: l.name, quantity: l.qty, unitPrice: l.unitPrice, taxRatePct: (l as any).taxRatePct || undefined, discountAmount: l.lineDiscount ?? 0 })),
       subtotal,
       taxTotal,
-      discountTotal: billDisc,
+  discountTotal: billDisc,
       grandTotal,
   paymentMethod: method,
   ...(refId ? { paymentReferenceId: refId } : {}),
