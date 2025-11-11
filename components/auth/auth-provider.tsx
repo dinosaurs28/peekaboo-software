@@ -60,7 +60,7 @@ export function useAuth() {
   return ctx;
 }
 
-const LOGIN_PATH = "/auth/login";
+const LOGIN_PATH = "/login";
 const ADMIN_HOME = "/dashboard";
 const CASHIER_HOME = "/pos";
 

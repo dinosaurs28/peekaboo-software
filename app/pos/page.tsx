@@ -11,7 +11,7 @@ export default function PosPage() {
 
   useEffect(() => {
     if (!loading && !user) {
-      window.location.href = "/auth/login";
+      window.location.href = "/login";
     }
   }, [loading, user]);
 
