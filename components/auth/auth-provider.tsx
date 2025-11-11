@@ -63,6 +63,7 @@ export function useAuth() {
 const LOGIN_PATH = "/login";
 const ADMIN_HOME = "/dashboard";
 const CASHIER_HOME = "/pos";
+const CASHIER_ALLOWED_PREFIXES = ["/pos", "/invoices", "/settings/barcodes/print"];
 
 export const AuthRedirector: React.FC = () => {
   const { user, role, loading } = useAuth();
@@ -87,7 +88,12 @@ export const AuthRedirector: React.FC = () => {
     }
 
     if (role === "cashier") {
-      if (pathname !== CASHIER_HOME) {
+      if (pathname === LOGIN_PATH) {
+        router.replace(CASHIER_HOME);
+        return;
+      }
+      const allowed = CASHIER_ALLOWED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+      if (!allowed) {
         router.replace(CASHIER_HOME);
       }
     }

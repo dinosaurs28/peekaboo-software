@@ -7,15 +7,19 @@ import { Topbar } from "@/components/layout/topbar";
 import { useAuth } from "@/components/auth/auth-provider";
 
 export default function PosPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
 
   useEffect(() => {
-    if (!loading && !user) {
-      window.location.href = "/login";
+    if (!loading) {
+      if (!user) {
+        window.location.href = "/login";
+      } else if (role !== "cashier") {
+        window.location.href = "/dashboard";
+      }
     }
-  }, [loading, user]);
+  }, [loading, user, role]);
 
-  if (!user) {
+  if (!user || role !== "cashier") {
     return <div className="p-8">Loading...</div>;
   }
 
