@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { listenToAuthState, ensureUserDocument, getUserRole } from "@/lib/auth";
 import { User as FirebaseUser } from "firebase/auth";
 import { UserRole } from "@/lib/models";
@@ -58,3 +59,39 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
+
+const LOGIN_PATH = "/auth/login";
+const ADMIN_HOME = "/dashboard";
+const CASHIER_HOME = "/pos";
+
+export const AuthRedirector: React.FC = () => {
+  const { user, role, loading } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (!user) {
+      if (pathname !== LOGIN_PATH) {
+        router.replace(LOGIN_PATH);
+      }
+      return;
+    }
+
+    if (role === "admin") {
+      if (pathname === "/" || pathname === LOGIN_PATH) {
+        router.replace(ADMIN_HOME);
+      }
+      return;
+    }
+
+    if (role === "cashier") {
+      if (pathname !== CASHIER_HOME) {
+        router.replace(CASHIER_HOME);
+      }
+    }
+  }, [user, role, loading, router, pathname]);
+
+  return null;
+};

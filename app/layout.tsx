@@ -4,9 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import { OfflineQueueStarter } from "@/components/offline/queue-starter";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { useAuth } from "@/components/auth/auth-provider";
+import { AuthRedirector } from "@/components/auth/auth-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,25 +26,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user, role, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.replace("/auth/login");
-      } else if (role === "admin") {
-        router.replace("/dashboard");
-      } else if (role === "cashier") {
-        router.replace("/pos");
-      }
-    }
-  }, [user, role, loading, router]);
-
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AuthProvider>
+          <AuthRedirector />
           <ToastProvider>
             {children}
             <OfflineQueueStarter />
