@@ -97,6 +97,8 @@ export interface CategoryDoc extends BaseDoc {
   code: string; // short uppercase code used in barcodes (e.g., CLO)
   description?: string;
   active: boolean;
+  defaultHsnCode?: string;
+  defaultTaxRatePct?: number;
 }
 
 // Goods receipt (group of received items)

@@ -11,6 +11,8 @@ export default function NewCategoryPage() {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
+  const [defaultHsnCode, setDefaultHsnCode] = useState("");
+  const [defaultTaxRatePct, setDefaultTaxRatePct] = useState("");
   const [active, setActive] = useState(true);
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
@@ -20,7 +22,15 @@ export default function NewCategoryPage() {
     if (!name || !code) { toast({ title: 'Validation', description: 'Name and Code are required', variant: 'destructive' }); return; }
     setBusy(true);
     try {
-      await createCategory({ name, code, description: description || undefined, active });
+      const parsedTax = parseFloat(defaultTaxRatePct);
+      await createCategory({
+        name,
+        code,
+        description: description || undefined,
+        active,
+        defaultHsnCode: defaultHsnCode.trim() || undefined,
+        defaultTaxRatePct: defaultTaxRatePct.trim() === "" || Number.isNaN(parsedTax) ? undefined : parsedTax,
+      });
       toast({ title: 'Category created', description: `${name} (${code})`, variant: 'success' });
       window.location.href = "/settings/categories";
     } catch (e) {
@@ -47,6 +57,20 @@ export default function NewCategoryPage() {
         <div>
           <label className="text-sm">Description (optional)</label>
           <Input value={description} onChange={e => setDescription(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm">Default HSN Code (optional)</label>
+          <Input value={defaultHsnCode} onChange={e => setDefaultHsnCode(e.target.value)} placeholder="e.g., 9503" />
+        </div>
+        <div>
+          <label className="text-sm">Default GST % (optional)</label>
+          <Input
+            type="number"
+            step="0.01"
+            value={defaultTaxRatePct}
+            onChange={e => setDefaultTaxRatePct(e.target.value)}
+            placeholder="e.g., 12"
+          />
         </div>
         <div className="flex items-center gap-2">
           <input id="active" type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} />

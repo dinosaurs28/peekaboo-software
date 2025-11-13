@@ -14,6 +14,8 @@ export function toCategoryDoc(id: string, data: Record<string, unknown>): Catego
     code: asString(data.code).toUpperCase(),
     description: typeof data.description === 'string' ? data.description : undefined,
     active: typeof data.active === 'boolean' ? data.active : true,
+    defaultHsnCode: typeof data.defaultHsnCode === 'string' ? data.defaultHsnCode : undefined,
+    defaultTaxRatePct: typeof data.defaultTaxRatePct === 'number' ? data.defaultTaxRatePct : undefined,
     createdAt: asString(data.createdAt, now),
     updatedAt: asString(data.updatedAt, now),
   };
@@ -35,19 +37,46 @@ export async function getCategory(id: string): Promise<CategoryDoc | null> {
   return toCategoryDoc(snap.id, snap.data() as DocumentData as Record<string, unknown>);
 }
 
-export async function createCategory(input: { name: string; code: string; description?: string; active?: boolean; }): Promise<string> {
+export async function createCategory(input: {
+  name: string;
+  code: string;
+  description?: string;
+  active?: boolean;
+  defaultHsnCode?: string;
+  defaultTaxRatePct?: number;
+}): Promise<string> {
   if (!db) throw new Error('Firestore not initialized');
   const col = collection(db, COLLECTIONS.categories);
-  const payload: Record<string, unknown> = { ...input, code: input.code.toUpperCase(), active: input.active ?? true, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+  const payload: Record<string, unknown> = {
+    ...input,
+    code: input.code.toUpperCase(),
+    active: input.active ?? true,
+    defaultHsnCode: input.defaultHsnCode,
+    defaultTaxRatePct: typeof input.defaultTaxRatePct === 'number' ? input.defaultTaxRatePct : undefined,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
   Object.keys(payload).forEach(k => (payload as Record<string, unknown>)[k] === undefined && delete (payload as Record<string, unknown>)[k]);
   const res = await addDoc(col, payload);
   return res.id;
 }
 
-export async function updateCategory(id: string, input: Partial<{ name: string; code: string; description?: string; active?: boolean; }>): Promise<void> {
+export async function updateCategory(id: string, input: Partial<{
+  name: string;
+  code: string;
+  description?: string;
+  active?: boolean;
+  defaultHsnCode?: string;
+  defaultTaxRatePct?: number;
+}>): Promise<void> {
   if (!db) throw new Error('Firestore not initialized');
   const ref = doc(db, COLLECTIONS.categories, id);
-  const payload: Record<string, unknown> = { ...input, ...(input.code ? { code: input.code.toUpperCase() } : {}), updatedAt: serverTimestamp() };
+  const payload: Record<string, unknown> = {
+    ...input,
+    ...(input.code ? { code: input.code.toUpperCase() } : {}),
+    ...(input.defaultTaxRatePct !== undefined ? { defaultTaxRatePct: input.defaultTaxRatePct } : {}),
+    updatedAt: serverTimestamp(),
+  };
   Object.keys(payload).forEach(k => (payload as Record<string, unknown>)[k] === undefined && delete (payload as Record<string, unknown>)[k]);
   await updateDoc(ref, payload);
 }

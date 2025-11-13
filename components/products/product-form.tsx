@@ -33,12 +33,53 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
 
   useEffect(() => {
     let mounted = true;
-    listCategories().then((cs) => { if (mounted) setCategories(cs.filter(c => c.active)); }).catch(() => undefined);
+    listCategories()
+      .then((cs) => {
+        if (mounted) setCategories(cs.filter((c) => c.active));
+      })
+      .catch(() => undefined);
     return () => { mounted = false; };
   }, []);
 
+  useEffect(() => {
+    if (!form.category || categories.length === 0) return;
+    const selected = categories.find((c) => c.name === form.category);
+    if (!selected) return;
+    setForm((prev) => {
+      if (prev.category !== selected.name) return prev;
+      const updates: Partial<UpsertProductInput> = {};
+      if ((!prev.hsnCode || prev.hsnCode.trim() === "") && selected.defaultHsnCode) {
+        updates.hsnCode = selected.defaultHsnCode;
+      }
+      if (
+        (prev.taxRatePct === undefined || prev.taxRatePct === null || prev.taxRatePct === 0) &&
+        selected.defaultTaxRatePct !== undefined &&
+        !Number.isNaN(selected.defaultTaxRatePct)
+      ) {
+        updates.taxRatePct = selected.defaultTaxRatePct;
+      }
+      return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
+    });
+  }, [categories, form.category]);
+
   function update<K extends keyof UpsertProductInput>(key: K, val: UpsertProductInput[K]) {
     setForm((f) => ({ ...f, [key]: val }));
+  }
+
+  function applyCategoryDefaults(categoryName?: string) {
+    setForm((prev) => {
+      const next: UpsertProductInput = { ...prev, category: categoryName };
+      if (!categoryName) return next;
+      const selected = categories.find((c) => c.name === categoryName);
+      if (!selected) return next;
+      if (selected.defaultHsnCode) {
+        next.hsnCode = selected.defaultHsnCode;
+      }
+      if (selected.defaultTaxRatePct !== undefined && !Number.isNaN(selected.defaultTaxRatePct)) {
+        next.taxRatePct = selected.defaultTaxRatePct;
+      }
+      return next;
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -85,7 +126,7 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
           <select
             className="h-9 rounded-md border bg-background px-3 text-sm"
             value={form.category ?? ""}
-            onChange={(e) => update("category", e.target.value || undefined)}
+            onChange={(e) => applyCategoryDefaults(e.target.value || undefined)}
           >
             <option value="">Select category</option>
             {categories.map((c) => (
@@ -99,7 +140,20 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">GST %</label>
-          <Input type="number" step="0.01" value={String(form.taxRatePct ?? 0)} onChange={(e) => update("taxRatePct", parseFloat(e.target.value) || 0)} placeholder="12" />
+          <Input
+            type="number"
+            step="0.01"
+            value={form.taxRatePct === undefined || form.taxRatePct === null ? "" : String(form.taxRatePct)}
+            onChange={(e) => {
+              if (e.target.value === "") {
+                update("taxRatePct", undefined as unknown as number);
+              } else {
+                const val = parseFloat(e.target.value);
+                update("taxRatePct", Number.isNaN(val) ? 0 : val);
+              }
+            }}
+            placeholder="12"
+          />
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">Cost Price</label>
