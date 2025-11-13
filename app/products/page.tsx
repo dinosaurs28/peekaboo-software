@@ -3,18 +3,22 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
-import { listProducts, deleteProduct } from "@/lib/products";
+import { listProducts, deleteProduct, updateProduct } from "@/lib/products";
 import type { ProductDoc } from "@/lib/models";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { listCategories } from "@/lib/categories";
+import type { CategoryDoc } from "@/lib/models";
 
 export default function ProductsListPage() {
   const { role, loading, user } = useAuth();
   const [products, setProducts] = useState<ProductDoc[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [skuQuery, setSkuQuery] = useState("");
+  const [categories, setCategories] = useState<CategoryDoc[]>([]);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   // Cashier can view list; only redirect if not signed in at all.
   useEffect(() => {
@@ -27,7 +31,7 @@ export default function ProductsListPage() {
     let mounted = true;
     async function load() {
       try {
-        const res = await listProducts();
+        const [res, cats] = await Promise.all([listProducts(), listCategories().catch(() => [])]);
         if (mounted) {
           const sorted = [...res].sort((a, b) => {
             const skuA = (a.sku ?? "").toString();
@@ -35,6 +39,7 @@ export default function ProductsListPage() {
             return skuA.localeCompare(skuB, undefined, { sensitivity: "base" });
           });
           setProducts(sorted);
+          setCategories(cats);
         }
       } catch (e) {
         console.error(e);
@@ -60,6 +65,39 @@ export default function ProductsListPage() {
       });
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function handleCategoryChange(product: ProductDoc, categoryName: string | undefined) {
+    if (!product.id) return;
+    const selected = categories.find((c) => c.name === categoryName);
+    setUpdatingId(product.id);
+    try {
+      const updates: Partial<ProductDoc> = { category: categoryName };
+      if (selected?.defaultHsnCode) updates.hsnCode = selected.defaultHsnCode;
+      if (selected?.defaultTaxRatePct !== undefined && !Number.isNaN(selected.defaultTaxRatePct)) {
+        updates.taxRatePct = selected.defaultTaxRatePct;
+      }
+      await updateProduct(product.id, updates);
+      setProducts((prev) => {
+        const next = prev.map((p) => {
+          if (p.id !== product.id) return p;
+          return {
+            ...p,
+            ...updates,
+          };
+        });
+        next.sort((a, b) => {
+          const skuA = (a.sku ?? "").toString();
+          const skuB = (b.sku ?? "").toString();
+          return skuA.localeCompare(skuB, undefined, { sensitivity: "base" });
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to update product category", err);
+    } finally {
+      setUpdatingId(null);
     }
   }
 
@@ -110,6 +148,7 @@ export default function ProductsListPage() {
                     <th className="px-6 py-3 text-gray-600">Name</th>
                     <th className="px-6 py-3 text-gray-600">SKU</th>
                     <th className="px-6 py-3 text-gray-600">Category</th>
+                    <th className="px-6 py-3 text-gray-600">HSN Code</th>
                     <th className="px-6 py-3 text-gray-600">Price</th>
                     <th className="px-6 py-3 text-gray-600">GST %</th>
                     <th className="px-6 py-3 text-gray-600">Stock</th>
@@ -122,7 +161,26 @@ export default function ProductsListPage() {
                     <tr key={p.id} className="border-b">
                       <td className="px-6 py-3 font-medium text-gray-900">{p.name}</td>
                       <td className="px-6 py-3">{p.sku}</td>
-                      <td className="px-6 py-3">{p.category || "-"}</td>
+                      <td className="px-6 py-3">
+                        {role === "admin" ? (
+                          <select
+                            className="h-9 rounded-md border bg-background px-3 text-sm"
+                            value={p.category ?? ""}
+                            onChange={(e) => handleCategoryChange(p, e.target.value || undefined)}
+                            disabled={updatingId === p.id}
+                          >
+                            <option value="">Unassigned</option>
+                            {categories.map((c) => (
+                              <option key={c.id} value={c.name}>
+                                {c.name} ({c.code})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          p.category || "-"
+                        )}
+                      </td>
+                      <td className="px-6 py-3">{p.hsnCode || "-"}</td>
                       <td className="px-6 py-3">₹{p.unitPrice.toFixed(2)}</td>
                       <td className="px-6 py-3">{p.taxRatePct ?? 0}</td>
                       <td className="px-6 py-3">{p.stock}</td>

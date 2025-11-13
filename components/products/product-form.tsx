@@ -52,7 +52,7 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
         updates.hsnCode = selected.defaultHsnCode;
       }
       if (
-        (prev.taxRatePct === undefined || prev.taxRatePct === null || prev.taxRatePct === 0) &&
+        (prev.taxRatePct === undefined || prev.taxRatePct === null) &&
         selected.defaultTaxRatePct !== undefined &&
         !Number.isNaN(selected.defaultTaxRatePct)
       ) {
