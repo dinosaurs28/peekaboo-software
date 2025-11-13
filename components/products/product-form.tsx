@@ -146,7 +146,7 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
             value={form.taxRatePct === undefined || form.taxRatePct === null ? "" : String(form.taxRatePct)}
             onChange={(e) => {
               if (e.target.value === "") {
-                update("taxRatePct", undefined as unknown as number);
+                update("taxRatePct", undefined);
               } else {
                 const val = parseFloat(e.target.value);
                 update("taxRatePct", Number.isNaN(val) ? 0 : val);

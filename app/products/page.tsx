@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { listProducts, deleteProduct } from "@/lib/products";
@@ -8,11 +8,13 @@ import type { ProductDoc } from "@/lib/models";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 export default function ProductsListPage() {
   const { role, loading, user } = useAuth();
   const [products, setProducts] = useState<ProductDoc[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [skuQuery, setSkuQuery] = useState("");
 
   // Cashier can view list; only redirect if not signed in at all.
   useEffect(() => {
@@ -26,7 +28,14 @@ export default function ProductsListPage() {
     async function load() {
       try {
         const res = await listProducts();
-        if (mounted) setProducts(res);
+        if (mounted) {
+          const sorted = [...res].sort((a, b) => {
+            const skuA = (a.sku ?? "").toString();
+            const skuB = (b.sku ?? "").toString();
+            return skuA.localeCompare(skuB, undefined, { sensitivity: "base" });
+          });
+          setProducts(sorted);
+        }
       } catch (e) {
         console.error(e);
       }
@@ -40,11 +49,25 @@ export default function ProductsListPage() {
     setBusy(id);
     try {
       await deleteProduct(id);
-      setProducts((p) => p.filter((x) => x.id !== id));
+      setProducts((p) => {
+        const next = p.filter((x) => x.id !== id);
+        next.sort((a, b) => {
+          const skuA = (a.sku ?? "").toString();
+          const skuB = (b.sku ?? "").toString();
+          return skuA.localeCompare(skuB, undefined, { sensitivity: "base" });
+        });
+        return next;
+      });
     } finally {
       setBusy(null);
     }
   }
+
+  const filteredProducts = useMemo(() => {
+    if (!skuQuery.trim()) return products;
+    const term = skuQuery.trim().toLowerCase();
+    return products.filter((p) => (p.sku ?? "").toLowerCase().includes(term));
+  }, [products, skuQuery]);
 
   return (
     <div className="flex min-h-screen w-full bg-gray-50 text-foreground">
@@ -58,7 +81,15 @@ export default function ProductsListPage() {
               <p className="text-xs text-gray-500 mt-1">Manage your product catalog, track stock levels, and update product details.</p>
             </div>
             {/* Add button aligned to the left like the reference */}
-            <div className="pt-1">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+              <div className="sm:w-72">
+                <Input
+                  placeholder="Search by SKU"
+                  value={skuQuery}
+                  onChange={(e) => setSkuQuery(e.target.value)}
+                  aria-label="Search products by SKU"
+                />
+              </div>
               {role === "admin" ? (
                 <Link href="/products/new" aria-label="Create product" title="Create product">
                   <Button variant="outline" size="icon" className="rounded-full">
@@ -87,7 +118,7 @@ export default function ProductsListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((p) => (
+                  {filteredProducts.map((p) => (
                     <tr key={p.id} className="border-b">
                       <td className="px-6 py-3 font-medium text-gray-900">{p.name}</td>
                       <td className="px-6 py-3">{p.sku}</td>
@@ -112,9 +143,16 @@ export default function ProductsListPage() {
                       )}
                     </tr>
                   ))}
-                  {products.length === 0 && (
+                  {filteredProducts.length === 0 && (
                     <tr>
-                      <td className="px-6 py-6 text-center text-gray-500" colSpan={6 + (role === 'admin' ? 2 : 0)}>No products yet.</td>
+                      <td
+                        className="px-6 py-6 text-center text-gray-500"
+                        colSpan={6 + (role === 'admin' ? 2 : 0)}
+                      >
+                        {products.length === 0
+                          ? "No products yet."
+                          : "No products match this SKU."}
+                      </td>
                     </tr>
                   )}
                 </tbody>
