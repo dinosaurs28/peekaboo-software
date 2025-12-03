@@ -71,8 +71,8 @@ export default function PrintLabelsPage() {
     const style = document.createElement('style');
     style.innerHTML = `
       @media print {
-        @page { size: 50.8mm 25.4mm; margin: 0; }
-        html, body { width: 50.8mm; height: 25.4mm; margin: 0; padding: 0; }
+        @page { size: 38.1mm 25.4mm; margin: 0; }
+        html, body { width: 38.1mm; height: 25.4mm; margin: 0; padding: 0; }
         /* Hide everything except our print root */
         body * { visibility: hidden !important; }
         #labels-print-root, #labels-print-root * { visibility: visible !important; }
@@ -128,7 +128,7 @@ export default function PrintLabelsPage() {
           key={idx}
           className="mx-auto"
           style={{
-            width: '50.8mm',
+            width: '38.1mm',
             height: '25.4mm',
             padding: '1mm',
             boxSizing: 'border-box',
@@ -143,8 +143,8 @@ export default function PrintLabelsPage() {
           <div style={{ fontSize: '8pt', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
             {prod.name}
           </div>
-          {/* Middle: Horizontal barcode (target ~2"×1") */}
-          <div style={{ width: '48.8mm', height: '12.7mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Middle: Horizontal barcode (target 1.5"×1") */}
+          <div style={{ width: '36.1mm', height: '12.7mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg ref={(el) => { svgRefs.current[idx] = el; }} style={{ width: '100%', height: '100%' }} />
           </div>
           {/* Bottom: Code and price stacked */}
