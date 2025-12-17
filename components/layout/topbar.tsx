@@ -57,13 +57,13 @@ export function Topbar() {
   }, []);
 
   return (
-    <header 
-    className="h-14 flex items-center gap-4 px-4 bg-background relative shadow-sm z-10">
-      <div className="flex-1 flex justify-center">
+    <header
+      className="h-14 border-b flex items-center gap-4 px-4 bg-background relative"
+    >
+      <div className="flex-1 flex items-center gap-4">
         <div className="relative max-w-sm w-full">
-          <Input placeholder="Search..." 
-          className="pl-4 rounded-4xl shadow-sm outline-none 
-          focus:ring focus:ring-ring placeholder:focus:outline-none" />
+          <Input placeholder="Search..."
+            className="pl-4 rounded-md shadow-sm outline-none focus:ring focus:ring-ring placeholder:focus:outline-none" />
         </div>
       </div>
 
@@ -121,7 +121,7 @@ export function Topbar() {
           onClick={() => setOpen((v) => !v)}
           aria-haspopup="menu"
           aria-expanded={open}
-          className="rounded-full border"
+          className="rounded-full"
         >
           <Avatar fallback={(user?.email?.[0] || "U").toUpperCase()} />
         </button>
