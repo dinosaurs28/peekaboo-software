@@ -192,7 +192,7 @@ export async function buildGstr1B2bCsv(
       ? customerMap.get(inv.customerId)
       : undefined;
 
-    const gstin = cust?.gstin?.trim();
+    const gstin = cust?.gstin?.trim().toUpperCase();
     if (!gstin || !isValidGstin(gstin)) continue;
 
     for (const item of inv.items) {
