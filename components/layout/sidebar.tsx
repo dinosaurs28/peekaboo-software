@@ -34,8 +34,9 @@ const Sidebar = () => {
         key={item.href}
         href={item.href}
         className={cn(
-          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors border",
+          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium border-2",
           "bg-gray-100 shadow-sm gap-4 text-center border-transparent m-4",
+          "transition-colors border-gray-200 hover:bg-gray-200 hover:text-primary-foreground",
           isActive
             ? "bg-primary text-primary-foreground"
             : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -48,22 +49,25 @@ const Sidebar = () => {
   };
 
   return ( 
-    <aside className="hidden md:flex md:flex-col w-56 border-r bg-background">
-      <div className="h-14 flex items-center px-4 
-      text-lg tracking-tight border-b bg-gray-50 text-primary-foreground">
+    <aside className="hidden md:flex md:flex-col w-56 bg-background">
+      <div className="h-14 flex items-center px-4 border-b-2
+      text-lg tracking-tight bg-gray-50 text-primary-foreground">
         <span className="flex items-center gap-2 font-bold text-2xl">
           <span className="text-primary font-bold pl-4">🧾</span> Billing Co.
         </span>
       </div>
+      <div className="flex-1 flex flex-col justify-between h-full border-r-2 bg-gray-100">
       <nav className="px-2 py-2 space-y-1 overflow-y-auto">
         {navItems.map((item) => renderNavItem(item))}
       </nav>
-      <div className="p-4 flex items-center border-t bottom-0 mt-auto gap-3">
-        <Avatar fallback={(user?.email?.[0] || 'U').toUpperCase()} />
+      <div className="p-4 flex items-center 
+      border-t bottom-0 mt-auto gap-3 bg-gray-200 text-muted-foreground">
+        <Avatar fallback={(user?.email?.[0] || 'U').toUpperCase()}  className="border"/>
         <div className="text-xs border-l">
           <p className="font-medium">{user?.email || 'User'}</p>
-          <p className="text-muted-foreground">{role || 'cashier'}</p>
+          <p className="text-xs text-muted-foreground">{role || 'cashier'}</p>
         </div>
+      </div>
       </div>
     </aside>
   );
