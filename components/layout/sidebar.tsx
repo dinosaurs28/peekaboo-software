@@ -49,15 +49,16 @@ const Sidebar = () => {
 
   return ( 
     <aside className="hidden md:flex md:flex-col w-56 border-r bg-background">
-      <div className="h-14 flex items-center px-4 font-semibold text-lg tracking-tight">
-        <span className="flex items-center gap-2">
-          <span className="text-primary">🧾</span> Billing Co.
+      <div className="h-14 flex items-center px-4 
+      text-lg tracking-tight border-b bg-gray-50 text-primary-foreground">
+        <span className="flex items-center gap-2 font-bold text-2xl">
+          <span className="text-primary font-bold pl-4">🧾</span> Billing Co.
         </span>
       </div>
-      <nav className="flex-1 px-2 py-2 space-y-1 overflow-y-auto">
+      <nav className="px-2 py-2 space-y-1 overflow-y-auto">
         {navItems.map((item) => renderNavItem(item))}
       </nav>
-      <div className="p-4 flex items-center gap-3 border-t">
+      <div className="p-4 flex items-center border-t bottom-0 mt-auto gap-3">
         <Avatar fallback={(user?.email?.[0] || 'U').toUpperCase()} />
         <div className="text-xs border-l">
           <p className="font-medium">{user?.email || 'User'}</p>
