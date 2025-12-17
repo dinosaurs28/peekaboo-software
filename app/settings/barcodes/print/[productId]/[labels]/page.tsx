@@ -56,7 +56,7 @@ export default function PrintLabelsPage() {
   useEffect(() => {
     // Render barcodes into all label slots once data is ready
     if (!codeText) return;
-    const opts = { format: "CODE128", displayValue: false, margin: 0, height: 80 } as const;
+    const opts = { format: "CODE128B", displayValue: false, margin: 0, height: 80 } as const;
     let drawn = 0;
     svgRefs.current.forEach((el) => { if (el) { JsBarcode(el, codeText, opts as any); drawn++; } });
     // Mark ready when we drew at least one barcode and have expected elements

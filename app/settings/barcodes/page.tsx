@@ -70,7 +70,7 @@ export default function BarcodeGeneratorPage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     try {
-      JsBarcode(canvas, code, { format: "CODE128", displayValue: false, margin: 4, height: 36 });
+      JsBarcode(canvas, code, { format: "CODE128B", displayValue: false, margin: 4, height: 36 });
     } catch (e) {
       console.error("Barcode render failed", e);
     }
