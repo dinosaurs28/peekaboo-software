@@ -1,75 +1,142 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
-import { Sidebar } from "@/components/layout/sidebar";
+import { useEffect, useMemo, useState } from "react";
+import Sidebar from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useParams } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, onSnapshot, orderBy, query, where, type DocumentData, type QuerySnapshot } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+  type DocumentData,
+  type QuerySnapshot,
+} from "firebase/firestore";
 import type { CustomerDoc, InvoiceDoc } from "@/lib/models";
 import { toInvoiceDoc } from "@/lib/invoices";
 
+interface Metrics {
+  visits: number;
+  totalSpend: number;
+  lastPurchase?: string;
+  topItems: Array<{ name: string; qty: number }>;
+}
+
+const EMPTY_METRICS: Metrics = {
+  visits: 0,
+  totalSpend: 0,
+  lastPurchase: undefined,
+  topItems: [],
+};
+
 export default function CustomerDetailPage() {
   const { user, loading } = useAuth();
-  const p = useParams();
-  const id = Array.isArray(p?.id) ? p!.id[0] : (p?.id as string);
-  const [cust, setCust] = useState<CustomerDoc | null>(null);
-  const [invoices, setInvoices] = useState<InvoiceDoc[]>([]);
-  const [pending, setPending] = useState(true);
-  const metrics = useMemo(() => {
-    if (!invoices.length) return { visits: 0, totalSpend: 0, lastPurchase: undefined as string | undefined, topItems: [] as Array<{ name: string; qty: number }> };
-    const visits = invoices.length;
-    const totalSpend = invoices.reduce((s, inv) => s + inv.grandTotal, 0);
-    const lastPurchase = invoices[0]?.issuedAt;
-    const counts = new Map<string, { name: string; qty: number }>();
-    for (const inv of invoices) {
-      for (const it of inv.items || []) {
-        const prev = counts.get(it.name) || { name: it.name, qty: 0 };
-        prev.qty += it.quantity;
-        counts.set(it.name, prev);
-      }
-    }
-    const topItems = Array.from(counts.values()).sort((a, b) => b.qty - a.qty).slice(0, 5);
-    return { visits, totalSpend, lastPurchase, topItems };
-  }, [invoices]);
+  const params = useParams();
+  const customerId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
 
+  const [customer, setCustomer] = useState<CustomerDoc | null>(null);
+  const [invoices, setInvoices] = useState<InvoiceDoc[]>([]);
+  const [invoicesPending, setInvoicesPending] = useState(true);
+
+  // Fetch customer data
   useEffect(() => {
-    if (!db || !id) return;
-    const ref = doc(db, 'Customers', id);
-    getDoc(ref).then(snap => {
-      if (snap.exists()) {
+    if (!db || !customerId) return;
+
+    const fetchCustomer = async () => {
+      if (db) {
+        const ref = doc(db, "Customers", customerId);
+        const snap = await getDoc(ref);
+
+        if (!snap.exists()) {
+          setCustomer(null);
+          return;
+        }
+
         const data = snap.data() as Record<string, unknown>;
         const now = new Date().toISOString();
-        const c: CustomerDoc = {
-          id: snap.id,
-          name: String(data.name || ''),
-          phone: typeof data.phone === 'string' ? data.phone : undefined,
-          email: typeof data.email === 'string' ? data.email : undefined,
-          notes: typeof data.notes === 'string' ? data.notes : undefined,
-          kidsDob: typeof data.kidsDob === 'string' ? data.kidsDob : undefined,
-          loyaltyPoints: typeof data.loyaltyPoints === 'number' ? data.loyaltyPoints : undefined,
-          totalSpend: typeof data.totalSpend === 'number' ? data.totalSpend : undefined,
-          createdAt: typeof data.createdAt === 'string' ? data.createdAt : now,
-          updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : now,
-        };
-        setCust(c);
-      } else {
-        setCust(null);
-      }
-    });
-  }, [id]);
 
+        const customer: CustomerDoc = {
+          id: snap.id,
+          name: String(data.name ?? ""),
+          phone: typeof data.phone === "string" ? data.phone : undefined,
+          email: typeof data.email === "string" ? data.email : undefined,
+          notes: typeof data.notes === "string" ? data.notes : undefined,
+          kidsDob: typeof data.kidsDob === "string" ? data.kidsDob : undefined,
+          loyaltyPoints: typeof data.loyaltyPoints === "number" ? data.loyaltyPoints : undefined,
+          totalSpend: typeof data.totalSpend === "number" ? data.totalSpend : undefined,
+          createdAt: typeof data.createdAt === "string" ? data.createdAt : now,
+          updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : now,
+        };
+
+        setCustomer(customer);
+      } else {
+        console.error("Firestore is not initialized.");
+        // Handle the case where db is undefined, perhaps set an error state or return
+      }
+    };
+
+    fetchCustomer();
+  }, [customerId]);
+
+  // Subscribe to invoices
   useEffect(() => {
-    if (!db || !id) return;
-    const col = collection(db, 'Invoices');
-    const q = query(col, where('customerId', '==', id), orderBy('issuedAt', 'desc'));
-    const unsub = onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
-      const list = snap.docs.map(d => toInvoiceDoc(d.id, d.data() as Record<string, unknown>));
-      setInvoices(list);
-      setPending(false);
-    });
-    return () => unsub();
-  }, [id]);
+    if (!db || !customerId) return;
+    if (db) {
+      const col = collection(db, "Invoices");
+      const q = query(
+        col,
+        where("customerId", "==", customerId),
+        orderBy("issuedAt", "desc")
+      );
+
+      const unsubscribe = onSnapshot(
+        q,
+        (snap: QuerySnapshot<DocumentData>) => {
+          const list = snap.docs.map((doc) =>
+            toInvoiceDoc(doc.id, doc.data() as Record<string, unknown>)
+          );
+          setInvoices(list);
+          setInvoicesPending(false);
+        },
+        (error) => {
+          console.error("Failed to fetch invoices:", error);
+          setInvoicesPending(false);
+        }
+      );
+      return () => unsubscribe();
+    }
+  }, [customerId]);
+
+  // Calculate metrics
+  const metrics = useMemo(() => {
+    if (!invoices.length) return EMPTY_METRICS;
+
+    const totalSpend = invoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
+    const itemCounts = new Map<string, { name: string; qty: number }>();
+
+    for (const invoice of invoices) {
+      for (const item of invoice.items ?? []) {
+        const current = itemCounts.get(item.name) ?? { name: item.name, qty: 0 };
+        current.qty += item.quantity;
+        itemCounts.set(item.name, current);
+      }
+    }
+
+    const topItems = Array.from(itemCounts.values())
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+
+    return {
+      visits: invoices.length,
+      totalSpend,
+      lastPurchase: invoices[0]?.issuedAt,
+      topItems,
+    };
+  }, [invoices]);
 
   if (loading) return <div className="p-6">Loading…</div>;
   if (!user) return null;
@@ -80,52 +147,82 @@ export default function CustomerDetailPage() {
       <div className="flex flex-col flex-1">
         <Topbar />
         <main className="flex-1 p-6 space-y-4">
+          {/* Header */}
           <div className="flex items-center justify-between">
-            <button className="h-9 px-3 border rounded-md text-sm" onClick={() => { window.location.href = "/customers"; }}>← Back</button>
+            <button
+              className="h-9 px-3 border rounded-md text-sm hover:bg-muted"
+              onClick={() => {
+                window.history.back();
+              }}
+            >
+              ← Back
+            </button>
             <h1 className="text-xl font-semibold">Customer</h1>
             <div />
           </div>
-          {cust ? (
+
+          {customer ? (
             <div className="space-y-4">
+              {/* Customer Info */}
               <div className="border rounded-md p-4 space-y-1">
-                <div className="font-medium">{cust.name}</div>
-                <div className="text-sm text-muted-foreground">{cust.phone || ''} {cust.email ? `• ${cust.email}` : ''}</div>
-                {cust.kidsDob && <div className="text-xs text-muted-foreground">Kid&apos;s DOB: {cust.kidsDob}</div>}
+                <div className="font-medium">{customer.name}</div>
+                <div className="text-sm text-muted-foreground">
+                  {customer.phone || ""}{" "}
+                  {customer.email ? `• ${customer.email}` : ""}
+                </div>
+                {customer.kidsDob && (
+                  <div className="text-xs text-muted-foreground">
+                    Kid&apos;s DOB: {customer.kidsDob}
+                  </div>
+                )}
               </div>
+
+              {/* Metrics Grid */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="border rounded-md p-4">
-                  <div className="text-sm text-muted-foreground">Total Spend</div>
-                  <div className="text-xl font-semibold">₹{metrics.totalSpend.toFixed(2)}</div>
-                </div>
-                <div className="border rounded-md p-4">
-                  <div className="text-sm text-muted-foreground">Visits</div>
-                  <div className="text-xl font-semibold">{metrics.visits}</div>
-                </div>
-                <div className="border rounded-md p-4">
-                  <div className="text-sm text-muted-foreground">Last Purchase</div>
-                  <div className="text-xl font-semibold">{metrics.lastPurchase ? new Date(metrics.lastPurchase).toLocaleDateString() : '—'}</div>
-                </div>
-                <div className="border rounded-md p-4">
-                  <div className="text-sm text-muted-foreground">Loyalty Points</div>
-                  <div className="text-xl font-semibold">{Math.max(0, Number(cust.loyaltyPoints || 0))}</div>
-                </div>
+                <MetricCard
+                  label="Total Spend"
+                  value={`₹${metrics.totalSpend.toFixed(2)}`}
+                />
+                <MetricCard label="Visits" value={String(metrics.visits)} />
+                <MetricCard
+                  label="Last Purchase"
+                  value={
+                    metrics.lastPurchase
+                      ? new Date(metrics.lastPurchase).toLocaleDateString()
+                      : "—"
+                  }
+                />
+                <MetricCard
+                  label="Loyalty Points"
+                  value={String(Math.max(0, customer.loyaltyPoints ?? 0))}
+                />
               </div>
+
+              {/* Top Items */}
               {metrics.topItems.length > 0 && (
                 <div className="border rounded-md p-4">
-                  <div className="text-sm text-muted-foreground mb-2">Top Items</div>
+                  <div className="text-sm text-muted-foreground mb-2">
+                    Top Items
+                  </div>
                   <ul className="text-sm list-disc pl-6">
-                    {metrics.topItems.map(it => (
-                      <li key={it.name}>{it.name} — {it.qty}</li>
+                    {metrics.topItems.map((item) => (
+                      <li key={item.name}>
+                        {item.name} — {item.qty}
+                      </li>
                     ))}
                   </ul>
                 </div>
               )}
             </div>
           ) : (
-            <div className="text-sm text-red-600">Not found</div>
+            <div className="text-sm text-red-600">Customer not found</div>
           )}
+
+          {/* Purchase History Table */}
           <div className="border rounded-md p-0">
-            <div className="px-4 pt-4 pb-2 text-sm text-muted-foreground">Purchase History</div>
+            <div className="px-4 pt-4 pb-2 text-sm text-muted-foreground">
+              Purchase History
+            </div>
             <div className="px-4 pb-4 overflow-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 text-left">
@@ -139,18 +236,35 @@ export default function CustomerDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map(inv => (
-                    <tr key={inv.id} className="border-t">
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(inv.issuedAt).toLocaleString()}</td>
-                      <td className="px-3 py-2">{inv.invoiceNumber}</td>
-                      <td className="px-3 py-2 text-right">₹{inv.subtotal.toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right">₹{(inv.discountTotal ?? 0).toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right font-medium">₹{inv.grandTotal.toFixed(2)}</td>
-                      <td className="px-3 py-2">{inv.cashierName || inv.cashierUserId}</td>
+                  {invoices.map((invoice) => (
+                    <tr key={invoice.id} className="border-t">
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {new Date(invoice.issuedAt).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2">{invoice.invoiceNumber}</td>
+                      <td className="px-3 py-2 text-right">
+                        ₹{invoice.subtotal.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        ₹{(invoice.discountTotal ?? 0).toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium">
+                        ₹{invoice.grandTotal.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2">
+                        {invoice.cashierName || invoice.cashierUserId}
+                      </td>
                     </tr>
                   ))}
-                  {invoices.length === 0 && !pending && (
-                    <tr><td className="px-3 py-6 text-center text-muted-foreground" colSpan={6}>No purchases yet.</td></tr>
+                  {invoices.length === 0 && !invoicesPending && (
+                    <tr>
+                      <td
+                        className="px-3 py-6 text-center text-muted-foreground"
+                        colSpan={6}
+                      >
+                        No purchases yet.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -158,6 +272,22 @@ export default function CustomerDetailPage() {
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+// Reusable metric card component
+function MetricCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="border rounded-md p-4">
+      <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="text-xl font-semibold">{value}</div>
     </div>
   );
 }
