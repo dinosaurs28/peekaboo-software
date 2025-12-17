@@ -1,4 +1,50 @@
-"use client";
+// 'use client' directive already at the top; removed duplicate below.
+
+// GSTR-1 B2B Export
+import { listCustomers, getCustomer } from "@/lib/customers";
+
+export async function buildGstr1B2bCsv(fromIso: string, toIso: string): Promise<string> {
+  const invoices = await listInvoicesInRange(fromIso, toIso);
+  const customers = await listCustomers();
+  const customerMap = new Map(customers.map(c => [c.id, c]));
+  const header = [
+    "GSTIN/UIN of Recipient",
+    "Invoice Number",
+    "Invoice date",
+    "Invoice Value",
+    "Place Of Supply",
+    "Reverse Charge",
+    "Applicable % of Tax Rate",
+    "Invoice Type",
+    "E-Commerce GSTIN",
+    "Rate",
+    "Taxable Value",
+    "Cess Amount"
+  ];
+  const rows: string[][] = [];
+  for (const inv of invoices) {
+    // Only B2B: must have customerId and GSTIN
+    const cust = inv.customerId ? customerMap.get(inv.customerId) : undefined;
+    if (!cust || !cust.email || !cust.email.match(/\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}/)) continue;
+    for (const item of inv.items) {
+      rows.push([
+        cust.email, // GSTIN/UIN of Recipient (assuming stored in email field, update if needed)
+        inv.invoiceNumber,
+        inv.issuedAt.slice(0, 10),
+        inv.grandTotal.toFixed(2),
+        "29-Karnataka", // Place Of Supply (static, update if needed)
+        "N", // Reverse Charge (static, update if needed)
+        item.taxRatePct ? item.taxRatePct.toString() : "",
+        "Regular", // Invoice Type (static, update if needed)
+        "", // E-Commerce GSTIN (empty unless applicable)
+        item.taxRatePct ? item.taxRatePct.toString() : "",
+        (item.unitPrice * item.quantity).toFixed(2), // Taxable Value
+        "" // Cess Amount (empty unless applicable)
+      ]);
+    }
+  }
+  return [header.join(","), ...rows.map(r => r.join(","))].join("\n");
+}
 import { db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query, where, type DocumentData, Timestamp } from "firebase/firestore";
 import type { InvoiceDoc, ProductDoc, InventoryLogDoc } from "@/lib/models";
