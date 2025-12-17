@@ -1,6 +1,5 @@
 "use client";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -15,8 +14,11 @@ export default function ReportsIndexPage() {
   if (loading) return <div className="p-6">Loading…</div>;
   if (!user) return null;
   return (
-    <div className="flex min-h-screen w-full bg-gray-50 text-foreground">
+    <div className="flex h-screen w-full bg-gray-50 text-foreground">
+      <div className="flex h-[100%]">
       <Sidebar />
+      </div>
+      <div className="flex flex-1 flex-col md:ml-1">
       <div className="flex flex-col flex-1">
         <Topbar />
         <main className="flex-1 p-8">
@@ -61,6 +63,7 @@ export default function ReportsIndexPage() {
           </div>
         </main>
       </div>
+    </div>
     </div>
   );
 }
