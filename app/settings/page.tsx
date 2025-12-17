@@ -1,96 +1,107 @@
 "use client";
-import Link from "next/link";
 import { useAuth } from "@/components/auth/auth-provider";
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Sidebar } from "@/components/layout/sidebar";
+import Sidebar from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import dynamic from "next/dynamic";
-import { useState, useMemo } from "react";
+
+type TabKey =
+  | "store"
+  | "receipt"
+  | "categories"
+  | "barcodes"
+  | "inventory"
+  | "offers"
+  | "offline"
+  | "audit";
+
+interface TabItem {
+  key: TabKey;
+  label: string;
+  icon?: string;
+}
+
+const TAB_CONFIG: Record<TabKey, string> = {
+  store: "./business-profile/page",
+  receipt: "./receipt-template/page",
+  categories: "./categories/page",
+  barcodes: "./barcodes/page",
+  inventory: "./inventory-logs/page",
+  offers: "./offers/page",
+  offline: "./offline-queue/page",
+  audit: "./audit-trail/page",
+};
 
 export default function SettingsIndexPage() {
   const { user, loading, role } = useAuth();
   const router = useRouter();
-  type TabKey = "store" | "receipt" | "categories" | "barcodes" | "inventory" | "offers" | "offline" | "audit";
   const [tab, setTab] = useState<TabKey>("store");
+
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
-  const items: { key: TabKey; label: string }[] = [
-    { key: "store", label: "Store Details" },
-    { key: "receipt", label: "Receipt Template" },
-    { key: "categories", label: "Categories" },
-    { key: "barcodes", label: "Barcode Generation" },
-    { key: "inventory", label: "Inventory Logs" },
-    { key: "audit", label: "Audit Trail" },
-    // Offers is admin-only per policy
-    ...(role === 'admin' ? [{ key: "offers", label: "Offers" } as const] : []),
-    { key: "offline", label: "Offline Queue" },
-  ];
 
-  // Lazy-load each section on demand; UI-only change, routes remain available elsewhere
-  const Section = useMemo(() => {
-    switch (tab) {
-      case "store":
-        return dynamic(() => import("./business-profile/page").then(m => m.default), { ssr: false });
-      case "receipt":
-        return dynamic(() => import("./receipt-template/page").then(m => m.default), { ssr: false });
-      case "categories":
-        return dynamic(() => import("./categories/page").then(m => m.default), { ssr: false });
-      case "barcodes":
-        return dynamic(() => import("./barcodes/page").then(m => m.default), { ssr: false });
-      case "inventory":
-        return dynamic(() => import("./inventory-logs/page").then(m => m.default), { ssr: false });
-      case "offers":
-        return dynamic(() => import("./offers/page").then(m => m.default), { ssr: false });
-      case "offline":
-        return dynamic(() => import("./offline-queue/page").then(m => m.default), { ssr: false });
-      case "audit":
-        return dynamic(() => import("./audit-trail/page").then(m => m.default), { ssr: false });
-      default:
-        return () => null as any;
-    }
-  }, [tab]);
+  const items: TabItem[] = useMemo(
+    () => [
+      { key: "store", label: "Store Details" },
+      { key: "receipt", label: "Receipt Template" },
+      { key: "categories", label: "Categories" },
+      { key: "barcodes", label: "Barcode Generation" },
+      { key: "inventory", label: "Inventory Logs" },
+      { key: "audit", label: "Audit Trail" },
+      ...(role === "admin" ? [{ key: "offers", label: "Offers" } as TabItem] : []),
+      { key: "offline", label: "Offline Queue" } as TabItem,
+    ],
+    [role]
+  );
+
+  const Section = useMemo(
+    () =>
+      dynamic(
+        () =>
+          import(TAB_CONFIG[tab]).then((m) => m.default),
+        { ssr: false, loading: () => <div>Loading...</div> }
+      ),
+    [tab]
+  );
+
   return (
-    <div className="flex min-h-screen w-full bg-gray-50 text-foreground">
+    <div className="flex h-screen w-full bg-gray-50">
       <Sidebar />
-      <div className="flex flex-col flex-1">
+      <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar />
-        <main className="flex-1 p-8">
-          <div className="max-w-6xl mx-auto space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Admin Hub</h1>
-              <p className="text-xs text-gray-500 mt-1">Manage your store configuration and tools.</p>
+        <main className="flex-1 overflow-auto p-8">
+          <div className="max-w-7xl mx-auto space-y-8">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+              <p className="text-sm text-gray-600">
+                Manage your store configuration and tools.
+              </p>
             </div>
 
-            {/* Top navigation styled like tabs; loads content inline below */}
-            <nav className="border-b border-gray-200">
-              <ul className="flex flex-wrap gap-6 text-sm">
-                {items.map((it) => {
-                  const active = tab === it.key;
-                  return (
-                    <li key={it.key}>
-                      <button
-                        type="button"
-                        onClick={() => setTab(it.key)}
-                        className={
-                          `inline-block pb-3 transition-colors ` +
-                          (active
-                            ? "text-sky-700 border-b-2 border-sky-600 font-medium"
-                            : "text-sky-600 hover:text-sky-700 border-b-2 border-transparent")
-                        }
-                        aria-pressed={active}
-                      >
-                        {it.label}
-                      </button>
-                    </li>
-                  );
-                })}
+            <nav className="border-b border-gray-200 bg-white rounded-t-lg">
+              <ul className="flex gap-1 px-4">
+                {items.map((item) => (
+                  <li key={item.key}>
+                    <button
+                      type="button"
+                      onClick={() => setTab(item.key)}
+                      className={`px-4 py-3 text-sm font-medium transition-all ${
+                        tab === item.key
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-600 hover:text-gray-900 border-b-2 border-transparent"
+                      }`}
+                      aria-pressed={tab === item.key}
+                    >
+                      {item.label}
+                    </button>
+                  </li>
+                ))}
               </ul>
             </nav>
 
-            {/* Active section renders in place, default is Store Details */}
-            <div className="pt-2">
+            <div className="bg-white rounded-b-lg shadow-sm p-6">
               <Section />
             </div>
           </div>
