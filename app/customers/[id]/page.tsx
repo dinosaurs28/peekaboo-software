@@ -36,7 +36,9 @@ const EMPTY_METRICS: Metrics = {
 export default function CustomerDetailPage() {
   const { user, loading } = useAuth();
   const params = useParams();
-  const customerId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
+  const customerId = Array.isArray(params?.id)
+    ? params.id[0]
+    : (params?.id as string);
 
   const [customer, setCustomer] = useState<CustomerDoc | null>(null);
   const [invoices, setInvoices] = useState<InvoiceDoc[]>([]);
@@ -66,8 +68,12 @@ export default function CustomerDetailPage() {
           email: typeof data.email === "string" ? data.email : undefined,
           notes: typeof data.notes === "string" ? data.notes : undefined,
           kidsDob: typeof data.kidsDob === "string" ? data.kidsDob : undefined,
-          loyaltyPoints: typeof data.loyaltyPoints === "number" ? data.loyaltyPoints : undefined,
-          totalSpend: typeof data.totalSpend === "number" ? data.totalSpend : undefined,
+          loyaltyPoints:
+            typeof data.loyaltyPoints === "number"
+              ? data.loyaltyPoints
+              : undefined,
+          totalSpend:
+            typeof data.totalSpend === "number" ? data.totalSpend : undefined,
           createdAt: typeof data.createdAt === "string" ? data.createdAt : now,
           updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : now,
         };
@@ -120,7 +126,10 @@ export default function CustomerDetailPage() {
 
     for (const invoice of invoices) {
       for (const item of invoice.items ?? []) {
-        const current = itemCounts.get(item.name) ?? { name: item.name, qty: 0 };
+        const current = itemCounts.get(item.name) ?? {
+          name: item.name,
+          qty: 0,
+        };
         current.qty += item.quantity;
         itemCounts.set(item.name, current);
       }
@@ -143,7 +152,10 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
-      <Sidebar />
+      <div className="flex h-[100%]">
+        <Sidebar />
+      </div>
+      <div className="flex flex-1 flex-col md:ml-1">
       <div className="flex flex-col flex-1">
         <Topbar />
         <main className="flex-1 p-6 space-y-4">
@@ -273,17 +285,12 @@ export default function CustomerDetailPage() {
         </main>
       </div>
     </div>
+    </div>
   );
 }
 
 // Reusable metric card component
-function MetricCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="border rounded-md p-4">
       <div className="text-sm text-muted-foreground">{label}</div>

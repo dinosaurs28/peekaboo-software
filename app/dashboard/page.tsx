@@ -21,8 +21,6 @@ const getTodayStr = () => {
   return `${y}-${m}-${day}`;
 };
 
-const STAT_SKELETON = { revenue: 0, topItems: [], revenueBuckets: [], lowStockCount: 0, prevRevenue: 0 };
-
 export default function DashboardPage() {
   const { user, loading, role } = useAuth();
   const [isDataLoading, setIsDataLoading] = useState(true);
@@ -31,16 +29,13 @@ export default function DashboardPage() {
   const [fromDate, setFromDate] = useState<string>(todayStr);
   const [toDate, setToDate] = useState<string>(todayStr);
 
-  // Dashboard stats
   const [revenue, setRevenue] = useState(0);
-  const [costMap, setCostMap] = useState<Record<string, number>>({});
   const [productMeta, setProductMeta] = useState<Record<string, { name: string; category?: string }>>({});
   const [topItems, setTopItems] = useState<Array<{ productId: string; name: string; category?: string; units: number; revenue: number }>>([]);
   const [revenueBuckets, setRevenueBuckets] = useState<Array<{ label: string; total: number }>>([]);
   const [prevRevenue, setPrevRevenue] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
 
-  // ISO date bounds
   const { fromIso, toIso, rangeDays } = useMemo(() => {
     if (!fromDate || !toDate) return { fromIso: undefined, toIso: undefined, rangeDays: 0 };
     
@@ -59,29 +54,24 @@ export default function DashboardPage() {
     };
   }, [fromDate, toDate]);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!loading && !user) {
       window.location.href = "/login";
     }
   }, [user, loading]);
 
-  // Load product metadata once
   useEffect(() => {
     const loadProducts = async () => {
       try {
         const prods = await listProducts();
-        const costMap: Record<string, number> = {};
         const meta: Record<string, { name: string; category?: string }> = {};
         
         prods.forEach((p) => {
           if (p.id) {
-            costMap[p.id] = p.costPrice ?? 0;
             meta[p.id] = { name: p.name, category: p.category };
           }
         });
         
-        setCostMap(costMap);
         setProductMeta(meta);
       } catch (err) {
         console.error("Failed to load products:", err);
@@ -91,13 +81,11 @@ export default function DashboardPage() {
     loadProducts();
   }, []);
 
-  // Low stock observer
   useEffect(() => {
     const unsub = observeLowStockProducts((items) => setLowStockCount(items.length));
     return () => { if (typeof unsub === 'function') unsub(); };
   }, []);
 
-  // Revenue data from invoices
   useEffect(() => {
     if (!db || !fromIso || !toIso) return;
 
@@ -120,12 +108,10 @@ export default function DashboardPage() {
           
           rev += validGrand;
 
-          // Bucket by day
           const issuedAt = typeof data.issuedAt === 'string' ? data.issuedAt : undefined;
           const dayKey = issuedAt?.slice(0, 10);
           if (dayKey) dayMap.set(dayKey, (dayMap.get(dayKey) || 0) + validGrand);
 
-          // Aggregate items
           const items = Array.isArray(data.items) ? (data.items as Array<Record<string, unknown>>) : [];
           items.forEach((it) => {
             const pid = String(it.productId ?? "");
@@ -167,7 +153,6 @@ export default function DashboardPage() {
     return () => unsub();
   }, [fromIso, toIso, productMeta]);
 
-  // Previous period revenue
   useEffect(() => {
     if (!db || !fromIso || !toIso) { setPrevRevenue(0); return; }
 
@@ -208,10 +193,8 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex w-full h-screen bg-slate-50">
-        <div className="flex h-[100%]">
         <Sidebar />
-      </div>
-        <div className="flex flex-1 flex-col overflow-hidden md:ml-1">
+        <div className="flex flex-1 flex-col overflow-hidden">
           <Topbar />
           <main className="flex-1 p-8 space-y-6">
             <div className="animate-pulse space-y-4">
@@ -229,32 +212,46 @@ export default function DashboardPage() {
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen w-full bg-gray-50 text-foreground">
-      <Sidebar />
-      <div className="flex flex-col flex-1">
+    <div className="flex w-full h-screen bg-slate-50">
+      <div className="flex h-[100%]">
+        <Sidebar />
+      </div>
+      <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar />
-        <main className="flex-1 p-8 space-y-6">
+        <main className="flex-1 overflow-y-auto p-6 md:p-8">
           {role !== "admin" ? (
             <PosPanel />
           ) : (
-            <>
+            <div className="space-y-6 max-w-7xl">
+              {/* Header */}
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
                 <p className="text-sm text-gray-500 mt-1">Overview of your store&apos;s performance</p>
               </div>
 
-              <Card className="p-4 bg-white">
-                <div className="flex flex-wrap items-end gap-3">
+              {/* Date Range Filters */}
+              <Card className="p-6 bg-white border border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-end gap-4">
                   <div className="flex flex-col">
-                    <label className="text-xs text-gray-600 mb-1">From</label>
-                    <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="bg-white" />
+                    <label className="text-sm font-medium text-gray-700 mb-2">From Date</label>
+                    <Input 
+                      type="date" 
+                      value={fromDate} 
+                      onChange={(e) => setFromDate(e.target.value)} 
+                      className="bg-white border-gray-300"
+                    />
                   </div>
                   <div className="flex flex-col">
-                    <label className="text-xs text-gray-600 mb-1">To</label>
-                    <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="bg-white" />
+                    <label className="text-sm font-medium text-gray-700 mb-2">To Date</label>
+                    <Input 
+                      type="date" 
+                      value={toDate} 
+                      onChange={(e) => setToDate(e.target.value)} 
+                      className="bg-white border-gray-300"
+                    />
                   </div>
                   <button
-                    className="h-9 px-4 rounded-md border border-gray-300 text-sm font-medium hover:bg-gray-50 transition-colors"
+                    className="h-10 px-6 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
                     onClick={handleTodayClick}
                   >
                     Today
@@ -262,47 +259,71 @@ export default function DashboardPage() {
                 </div>
               </Card>
 
+              {/* Stats Grid */}
               <div className="grid gap-6 md:grid-cols-3">
                 {isDataLoading ? (
-                  [...Array(3)].map((_, i) => <div key={i} className="h-24 bg-gray-200 rounded animate-pulse"></div>)
+                  [...Array(3)].map((_, i) => <div key={i} className="h-28 bg-gray-200 rounded-lg animate-pulse"></div>)
                 ) : (
                   <>
-                    <StatCard label="Daily Sales" value={`₹${revenue.toLocaleString()}`} subtext={rangeSubtext} className="bg-white" />
-                    <StatCard label="Top Selling Item" value={topItems.length > 0 ? topItems[0].name : '—'} subtext={rangeSubtext} className="bg-white" />
-                    <StatCard label="Low Stock Items" value={lowStockCount} subtext="Today" className="bg-white" />
+                    <StatCard 
+                      label="Daily Sales" 
+                      value={`₹${revenue.toLocaleString()}`} 
+                      subtext={rangeSubtext} 
+                      className="bg-white border border-gray-200" 
+                    />
+                    <StatCard 
+                      label="Top Selling Item" 
+                      value={topItems.length > 0 ? topItems[0].name : '—'} 
+                      subtext={rangeSubtext} 
+                      className="bg-white border border-gray-200" 
+                    />
+                    <StatCard 
+                      label="Low Stock Items" 
+                      value={lowStockCount} 
+                      subtext="Products below threshold" 
+                      className="bg-white border border-gray-200" 
+                    />
                   </>
                 )}
               </div>
 
-              <Card className="bg-white p-6">
+              {/* Revenue Chart */}
+              <Card className="bg-white p-6 border border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900 mb-6">Revenue</h2>
                 {isDataLoading ? (
-                  <div className="h-48 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-64 bg-gray-200 rounded-lg animate-pulse"></div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div>
-                      <p className="text-sm text-gray-500">Revenue Over Time</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-1">₹{revenue.toLocaleString()}</p>
+                      <p className="text-sm font-medium text-gray-600">Revenue Over Time</p>
+                      <p className="text-4xl font-bold text-gray-900 mt-2">₹{revenue.toLocaleString()}</p>
                       {(() => {
                         const pct = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : (revenue > 0 ? 100 : 0);
                         const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
-                        const label = rangeDays > 1 ? `Last ${rangeDays} Days` : 'Vs previous day';
+                        const label = rangeDays > 1 ? `Last ${rangeDays} Days` : 'vs Previous Day';
                         const cls = pct > 0 ? 'text-emerald-600' : pct < 0 ? 'text-rose-600' : 'text-gray-500';
-                        return <p className={`text-sm mt-1 ${cls}`}>{label} {pctStr}</p>;
+                        return <p className={`text-sm font-medium mt-2 ${cls}`}>{label} {pctStr}</p>;
                       })()}
                     </div>
 
-                    <div className="h-48 flex items-end gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
+                    <div className="h-56 flex items-end gap-1 border-b border-gray-200 pb-4 overflow-x-auto">
                       {(() => {
                         const max = Math.max(1, ...revenueBuckets.map(b => b.total));
                         return revenueBuckets.length > 0 ? revenueBuckets.map((b) => {
-                          const h = Math.max(4, Math.round((b.total / max) * 180));
-                          return <div key={b.label} className="flex-1 min-w-6 bg-blue-500 hover:bg-blue-600 rounded-t transition-colors" style={{ height: `${h}px` }} title={`${b.label}: ₹${b.total.toLocaleString()}`} />;
-                        }) : <p className="text-gray-500 text-sm">No data available</p>;
+                          const h = Math.max(8, Math.round((b.total / max) * 200));
+                          return (
+                            <div 
+                              key={b.label} 
+                              className="flex-1 min-w-8 bg-gradient-to-t from-blue-600 to-blue-400 hover:from-blue-700 hover:to-blue-500 rounded-t-md transition-colors cursor-pointer" 
+                              style={{ height: `${h}px` }} 
+                              title={`${b.label}: ₹${b.total.toLocaleString()}`} 
+                            />
+                          );
+                        }) : <p className="text-gray-500 text-sm w-full text-center">No data available</p>;
                       })()}
                     </div>
                     {revenueBuckets.length > 0 && (
-                      <div className="flex justify-between text-xs text-gray-500 mt-2">
+                      <div className="flex justify-between text-xs text-gray-500">
                         <span>{revenueBuckets[0]?.label}</span>
                         <span>{revenueBuckets[revenueBuckets.length - 1]?.label}</span>
                       </div>
@@ -311,31 +332,32 @@ export default function DashboardPage() {
                 )}
               </Card>
 
-              <Card className="bg-white p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Selling Items</h2>
+              {/* Top Selling Items */}
+              <Card className="bg-white p-6 border border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900 mb-6">Top Selling Items</h2>
                 {isDataLoading ? (
-                  <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-12 bg-gray-200 rounded animate-pulse"></div>)}</div>
+                  <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="h-12 bg-gray-200 rounded-md animate-pulse"></div>)}</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Item Name</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Category</th>
-                          <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Units Sold</th>
-                          <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Revenue</th>
+                        <tr className="border-b border-gray-300">
+                          <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Item Name</th>
+                          <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Category</th>
+                          <th className="text-right py-4 px-4 text-sm font-semibold text-gray-700">Units Sold</th>
+                          <th className="text-right py-4 px-4 text-sm font-semibold text-gray-700">Revenue</th>
                         </tr>
                       </thead>
                       <tbody>
                         {topItems.length === 0 ? (
-                          <tr><td className="py-6 px-4 text-sm text-gray-500" colSpan={4}>No sales in the selected range.</td></tr>
+                          <tr><td className="py-8 px-4 text-center text-gray-500" colSpan={4}>No sales in the selected range.</td></tr>
                         ) : (
                           topItems.slice(0, 10).map((it) => (
                             <tr key={it.productId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                              <td className="py-3 px-4 text-sm text-gray-900">{it.name}</td>
-                              <td className="py-3 px-4 text-sm text-blue-600">{it.category || '—'}</td>
-                              <td className="py-3 px-4 text-sm text-gray-600 text-right">{it.units}</td>
-                              <td className="py-3 px-4 text-sm text-gray-900 text-right">₹{it.revenue.toLocaleString()}</td>
+                              <td className="py-4 px-4 text-sm font-medium text-gray-900">{it.name}</td>
+                              <td className="py-4 px-4 text-sm text-blue-600">{it.category || '—'}</td>
+                              <td className="py-4 px-4 text-sm text-gray-600 text-right">{it.units}</td>
+                              <td className="py-4 px-4 text-sm font-medium text-gray-900 text-right">₹{it.revenue.toLocaleString()}</td>
                             </tr>
                           ))
                         )}
@@ -346,7 +368,7 @@ export default function DashboardPage() {
               </Card>
 
               <LowStockAlerts />
-            </>
+            </div>
           )}
         </main>
       </div>
