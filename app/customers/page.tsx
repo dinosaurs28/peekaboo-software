@@ -38,10 +38,11 @@ export default function CustomersPage() {
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return items;
-    return items.filter((c) =>
-      c.name.toLowerCase().includes(s) ||
-      c.phone?.toLowerCase().includes(s) ||
-      c.email?.toLowerCase().includes(s)
+    return items.filter(
+      (c) =>
+        c.name.toLowerCase().includes(s) ||
+        c.phone?.toLowerCase().includes(s) ||
+        c.email?.toLowerCase().includes(s)
     );
   }, [q, items]);
 
