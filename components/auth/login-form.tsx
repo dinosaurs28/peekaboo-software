@@ -16,9 +16,9 @@ const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
 const ERROR_MESSAGES: Record<string, string> = {
   "auth/configuration-not-found": "Email/Password sign-in is not enabled. Enable it in Firebase Console → Authentication.",
   "auth/operation-not-allowed": "Email/Password sign-in is not enabled. Enable it in Firebase Console → Authentication.",
-  "auth/user-not-found": "No account found for this email.",
-  "auth/wrong-password": "Incorrect email or password.",
-  "auth/invalid-credential": "Incorrect email or password.",
+  "auth/user-not-found": "No account found for this email !",
+  "auth/wrong-password": "Incorrect email or password !",
+  "auth/invalid-credential": "Incorrect email or password !",
   "auth/too-many-requests": "Too many attempts. Please wait a minute and try again.",
   "auth/network-request-failed": "Network error. Check your connection and try again.",
 };
@@ -102,7 +102,7 @@ export const LoginForm: React.FC<Props> = ({ redirectTo = "/dashboard" }) => {
         </div>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-destructive text-red-500">{error}</p>}
 
       <Button
         type="submit"
