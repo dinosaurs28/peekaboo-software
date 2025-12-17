@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { Sidebar } from "@/components/layout/sidebar";
+import Sidebar from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";

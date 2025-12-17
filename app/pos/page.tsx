@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { PosPanel } from "@/components/pos/pos-panel";
-import { Sidebar } from "@/components/layout/sidebar";
+import Sidebar from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { useAuth } from "@/components/auth/auth-provider";
 
