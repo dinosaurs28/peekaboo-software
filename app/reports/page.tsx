@@ -1,38 +1,61 @@
 "use client";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { useAuth } from "@/components/auth/auth-provider";
-import { listInvoicesInRange, aggregateByPeriod, aggregatePaymentModes, buildAccountingCsv, aggregateInventoryMovement, type Period } from "@/lib/reports";
+
+import {
+  listInvoicesInRange,
+  aggregateByPeriod,
+  aggregatePaymentModes,
+  buildAccountingCsv,
+  aggregateInventoryMovement,
+  type Period,
+} from "@/lib/reports";
+
 import { listProducts } from "@/lib/products";
+
+/* ======================================================
+   PAGE
+====================================================== */
 
 export default function ReportsIndexPage() {
   const { user, loading } = useAuth();
-  // Inline tabs like Settings
-  type TabKey = "sales" | "payments" | "accounting" | "stock" | "movement";
+  type TabKey =
+    | "sales"
+    | "payments"
+    | "profitloss"
+    | "accounting"
+    | "stock"
+    | "movement";
+
   const [tab, setTab] = useState<TabKey>("sales");
+
   if (loading) return <div className="p-6">Loading…</div>;
   if (!user) return null;
+
   return (
-    <div className="flex min-h-screen w-full bg-gray-50 text-foreground">
+    <div className="flex h-screen w-full bg-gray-50 text-foreground">
       <Sidebar />
-      <div className="flex flex-col flex-1">
+      <div className="flex flex-1 flex-col">
         <Topbar />
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-8 overflow-auto">
           <div className="max-w-6xl mx-auto space-y-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-              <p className="text-sm text-gray-500 mt-1">Analyze your store’s performance with detailed sales and profit/loss reports.</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Analyze sales, payments, inventory and export accounting & GST data.
+              </p>
             </div>
 
-            {/* Tabbed navigation like Settings; renders inline below */}
+            {/* Tabs */}
             <nav className="border-b border-gray-200">
               <ul className="flex flex-wrap gap-6 text-sm">
                 {([
                   { key: "sales", label: "Sales" },
                   { key: "payments", label: "Payments" },
-                  { key: "accounting", label: "Accounting Export" },
+                  { key: "profitloss", label: "Profit & Loss" },
+                  { key: "accounting", label: "Accounting & GST Export" },
                   { key: "stock", label: "Stock" },
                   { key: "movement", label: "Movement" },
                 ] as Array<{ key: TabKey; label: string }>).map((it) => (
@@ -40,8 +63,11 @@ export default function ReportsIndexPage() {
                     <button
                       type="button"
                       onClick={() => setTab(it.key)}
-                      className={`inline-block pb-3 transition-colors ${tab === it.key ? 'text-sky-700 border-b-2 border-sky-600 font-medium' : 'text-sky-600 hover:text-sky-700 border-b-2 border-transparent'}`}
-                      aria-pressed={tab === it.key}
+                      className={`inline-block pb-3 transition-colors ${
+                        tab === it.key
+                          ? "text-sky-700 border-b-2 border-sky-600 font-medium"
+                          : "text-sky-600 hover:text-sky-700 border-b-2 border-transparent"
+                      }`}
                     >
                       {it.label}
                     </button>
@@ -50,13 +76,14 @@ export default function ReportsIndexPage() {
               </ul>
             </nav>
 
-            {/* Active tab content (inline) */}
+            {/* Content */}
             <div className="pt-2">
-              {tab === 'sales' && <SalesInline />}
-              {tab === 'payments' && <PaymentsInline />}
-              {tab === 'accounting' && <AccountingInline />}
-              {tab === 'stock' && <StockInline />}
-              {tab === 'movement' && <MovementInline />}
+              {tab === "sales" && <SalesInline />}
+              {tab === "payments" && <PaymentsInline />}
+              {tab === "profitloss" && <ProfitLossInline />}
+              {tab === "accounting" && <AccountingInline />}
+              {tab === "stock" && <StockInline />}
+              {tab === "movement" && <MovementInline />}
             </div>
           </div>
         </main>
@@ -65,257 +92,387 @@ export default function ReportsIndexPage() {
   );
 }
 
-// Helpers
-function toIsoDateTimeLocal(d: Date) {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const y = d.getFullYear();
-  const m = pad(d.getMonth() + 1);
-  const day = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const mm = pad(d.getMinutes());
-  return `${y}-${m}-${day}T${hh}:${mm}`;
+/* ======================================================
+   HELPERS
+====================================================== */
+
+function toIsoLocal(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
 }
 
-// Inline Sales
-function SalesInline() {
-  const [from, setFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 7); d.setHours(0, 0, 0, 0); return d; });
-  const [to, setTo] = useState(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; });
-  const [period, setPeriod] = useState<Period>('day');
-  const [rows, setRows] = useState<{ period: string; invoices: number; total: number }[]>([]);
-  const [loading, setLoading] = useState(false);
-  async function run() {
-    setLoading(true);
-    try {
-      const data = await listInvoicesInRange(from.toISOString(), to.toISOString());
-      setRows(aggregateByPeriod(data, period));
-    } finally { setLoading(false); }
-  }
-  useEffect(() => { run(); }, []);
+function downloadFile(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ======================================================
+   DATE RANGE
+====================================================== */
+
+function DateRangeFilter({
+  from,
+  to,
+  onFromChange,
+  onToChange,
+}: {
+  from: Date;
+  to: Date;
+  onFromChange: (d: Date) => void;
+  onToChange: (d: Date) => void;
+}) {
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div>
-          <label className="text-sm text-gray-600">From</label>
-          <input type="datetime-local" className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={toIsoDateTimeLocal(from)} onChange={(e) => setFrom(new Date(e.target.value))} />
-        </div>
-        <div>
-          <label className="text-sm text-gray-600">To</label>
-          <input type="datetime-local" className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={toIsoDateTimeLocal(to)} onChange={(e) => setTo(new Date(e.target.value))} />
-        </div>
-        <div>
-          <label className="text-sm text-gray-600">Group by</label>
-          <select className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
-            <option value="day">Day</option>
-            <option value="week">Week</option>
-            <option value="month">Month</option>
-          </select>
-        </div>
-        <div className="flex items-end">
-          <button className="px-3 py-2 rounded-md border bg-background w-full" onClick={run} disabled={loading}>{loading ? 'Loading…' : 'Run'}</button>
-        </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label className="text-sm text-gray-600">From</label>
+        <input
+          type="datetime-local"
+          className="w-full h-9 rounded-md border px-2 text-sm"
+          value={toIsoLocal(from)}
+          onChange={(e) => onFromChange(new Date(e.target.value))}
+        />
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left">
-            <tr>
-              <th className="px-3 py-2">Period</th>
-              <th className="px-3 py-2">Invoices</th>
-              <th className="px-3 py-2 text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(r => (
-              <tr key={r.period} className="border-t">
-                <td className="px-3 py-2">{r.period}</td>
-                <td className="px-3 py-2">{r.invoices}</td>
-                <td className="px-3 py-2 text-right">₹{r.total.toFixed(2)}</td>
-              </tr>
-            ))}
-            {rows.length === 0 && <tr><td className="px-3 py-6 text-center text-gray-500" colSpan={3}>No data</td></tr>}
-          </tbody>
-        </table>
+      <div>
+        <label className="text-sm text-gray-600">To</label>
+        <input
+          type="datetime-local"
+          className="w-full h-9 rounded-md border px-2 text-sm"
+          value={toIsoLocal(to)}
+          onChange={(e) => onToChange(new Date(e.target.value))}
+        />
       </div>
     </div>
   );
 }
 
-// Inline Payments
+/* ======================================================
+   SALES
+====================================================== */
+
+function SalesInline() {
+  const [from, setFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [to, setTo] = useState(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  });
+  const [period, setPeriod] = useState<Period>("day");
+  const [rows, setRows] = useState<
+    { period: string; invoices: number; total: number }[]
+  >([]);
+  const [loading, setLoading] = useState(false);
+
+  const run = useCallback(async () => {
+    setLoading(true);
+    try {
+      const invs = await listInvoicesInRange(
+        from.toISOString(),
+        to.toISOString()
+      );
+      setRows(aggregateByPeriod(invs, period));
+    } finally {
+      setLoading(false);
+    }
+  }, [from, to, period]);
+
+  useEffect(() => {
+    run();
+  }, [run]);
+
+  return (
+    <div className="space-y-4">
+      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+      <select
+        className="h-9 rounded-md border px-2 text-sm"
+        value={period}
+        onChange={(e) => setPeriod(e.target.value as Period)}
+      >
+        <option value="day">Day</option>
+        <option value="week">Week</option>
+        <option value="month">Month</option>
+      </select>
+      <Table
+        columns={["Period", "Invoices", "Total"]}
+        rows={rows.map((r) => [
+          r.period,
+          r.invoices,
+          `₹${r.total.toFixed(2)}`,
+        ])}
+        emptyText="No data"
+      />
+    </div>
+  );
+}
+
+/* ======================================================
+   PAYMENTS
+====================================================== */
+
 function PaymentsInline() {
-  const [from, setFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); d.setHours(0, 0, 0, 0); return d; });
-  const [to, setTo] = useState(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; });
+  const [from, setFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [to, setTo] = useState(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  });
   const [rows, setRows] = useState<{ method: string; amount: number }[]>([]);
   const [loading, setLoading] = useState(false);
-  async function run() {
+
+  const run = async () => {
     setLoading(true);
     try {
-      const invs = await listInvoicesInRange(from.toISOString(), to.toISOString());
+      const invs = await listInvoicesInRange(
+        from.toISOString(),
+        to.toISOString()
+      );
       setRows(aggregatePaymentModes(invs));
-    } finally { setLoading(false); }
-  }
-  useEffect(() => { run(); }, []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    run();
+  }, []);
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-          <label className="text-sm text-gray-600">From</label>
-          <input type="datetime-local" className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={toIsoDateTimeLocal(from)} onChange={(e) => setFrom(new Date(e.target.value))} />
-        </div>
-        <div>
-          <label className="text-sm text-gray-600">To</label>
-          <input type="datetime-local" className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={toIsoDateTimeLocal(to)} onChange={(e) => setTo(new Date(e.target.value))} />
-        </div>
-        <div className="flex items-end">
-          <button className="px-3 py-2 rounded-md border bg-background w-full" onClick={run} disabled={loading}>{loading ? 'Loading…' : 'Run'}</button>
-        </div>
-      </div>
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left">
-            <tr>
-              <th className="px-3 py-2">Payment Mode</th>
-              <th className="px-3 py-2 text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(r => (
-              <tr key={r.method} className="border-t">
-                <td className="px-3 py-2 capitalize">{r.method}</td>
-                <td className="px-3 py-2 text-right">₹{r.amount.toFixed(2)}</td>
-              </tr>
-            ))}
-            {rows.length === 0 && <tr><td className="px-3 py-6 text-center text-gray-500" colSpan={2}>No data</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+      <Table
+        columns={["Payment Mode", "Amount"]}
+        rows={rows.map((r) => [r.method, `₹${r.amount.toFixed(2)}`])}
+        emptyText="No data"
+      />
     </div>
   );
 }
 
-// Inline Accounting Export
+/* ======================================================
+   PROFIT & LOSS (placeholder)
+====================================================== */
+
+function ProfitLossInline() {
+  return (
+    <div className="text-sm text-gray-500">
+      Profit & Loss will be calculated using costPrice × quantity.
+      (TODO: implement real COGS logic)
+    </div>
+  );
+}
+
+/* ======================================================
+   ACCOUNTING & GST EXPORT
+====================================================== */
+
 function AccountingInline() {
-  const [from, setFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); d.setHours(0, 0, 0, 0); return d; });
-  const [to, setTo] = useState(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; });
+  const [from, setFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [to, setTo] = useState(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  });
   const [busy, setBusy] = useState(false);
-  async function exportCsv() {
+
+  const exportAccounting = async () => {
     setBusy(true);
     try {
-      const csv = await buildAccountingCsv(from.toISOString(), to.toISOString());
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `accounting_${from.toISOString().slice(0, 10)}_${to.toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } finally { setBusy(false); }
-  }
+      const csv = await buildAccountingCsv(
+        from.toISOString(),
+        to.toISOString()
+      );
+      downloadFile(
+        csv,
+        `accounting_${from.toISOString().slice(0, 10)}_${to
+          .toISOString()
+          .slice(0, 10)}.csv`,
+        "text/csv"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportAll = async () => {
+    setBusy(true);
+    try {
+      const { buildUnifiedExportCsv } = await import("@/lib/reports");
+      const csv = await buildUnifiedExportCsv(
+        from.toISOString(),
+        to.toISOString()
+      );
+      downloadFile(
+        csv,
+        `ALL_REPORTS_${from.toISOString().slice(0, 10)}_${to
+          .toISOString()
+          .slice(0, 10)}.csv`,
+        "text/csv"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-          <label className="text-sm text-gray-600">From</label>
-          <input type="datetime-local" className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={toIsoDateTimeLocal(from)} onChange={(e) => setFrom(new Date(e.target.value))} />
-        </div>
-        <div>
-          <label className="text-sm text-gray-600">To</label>
-          <input type="datetime-local" className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={toIsoDateTimeLocal(to)} onChange={(e) => setTo(new Date(e.target.value))} />
-        </div>
-        <div className="flex items-end">
-          <button className="px-3 py-2 rounded-md border bg-background w-full" onClick={exportCsv} disabled={busy}>{busy ? 'Preparing…' : 'Export CSV'}</button>
-        </div>
+      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+
+      <div className="flex gap-2">
+        <button
+          className="px-3 py-2 rounded-md border"
+          onClick={exportAccounting}
+          disabled={busy}
+        >
+          Export Accounting CSV
+        </button>
+
+        <button
+          className="px-3 py-2 rounded-md bg-emerald-600 text-white"
+          onClick={exportAll}
+          disabled={busy}
+        >
+          Export ALL (Accounting + GST)
+        </button>
       </div>
-      <div className="text-sm text-gray-500">Generates a CSV compatible with accounting systems using your current product and invoice data.</div>
     </div>
   );
 }
 
-// Inline Stock
+/* ======================================================
+   STOCK
+====================================================== */
+
 function StockInline() {
-  const [rows, setRows] = useState<Array<{ id?: string; name: string; sku: string; unitPrice: number; stock: number }>>([]);
-  useEffect(() => { listProducts().then((ps) => setRows(ps.map(p => ({ id: p.id, name: p.name, sku: p.sku, unitPrice: p.unitPrice, stock: p.stock })))).catch(() => undefined); }, []);
+  const [rows, setRows] = useState<
+    { name: string; sku: string; stock: number; unitPrice: number }[]
+  >([]);
+
+  useEffect(() => {
+    listProducts().then((ps) =>
+      setRows(
+        ps.map((p) => ({
+          name: p.name,
+          sku: p.sku,
+          stock: p.stock,
+          unitPrice: p.unitPrice,
+        }))
+      )
+    );
+  }, []);
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <Table
+      columns={["Name", "SKU", "Stock", "Price"]}
+      rows={rows.map((r) => [
+        r.name,
+        r.sku,
+        r.stock,
+        `₹${r.unitPrice.toFixed(2)}`,
+      ])}
+      emptyText="No products"
+    />
+  );
+}
+
+/* ======================================================
+   MOVEMENT
+====================================================== */
+
+function MovementInline() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [from, setFrom] = useState(new Date());
+  const [to, setTo] = useState(new Date());
+
+  useEffect(() => {
+    aggregateInventoryMovement(from.toISOString(), to.toISOString()).then(
+      setRows
+    );
+  }, []);
+
+  return (
+    <Table
+      columns={["Product", "SKU", "Qty In", "Qty Out", "Net"]}
+      rows={rows.map((r) => [
+        r.name,
+        r.sku,
+        r.qtyIn,
+        r.qtyOut,
+        r.net,
+      ])}
+      emptyText="No movement"
+    />
+  );
+}
+
+/* ======================================================
+   TABLE
+====================================================== */
+
+function Table({
+  columns,
+  rows,
+  emptyText,
+}: {
+  columns: string[];
+  rows: (string | number)[][];
+  emptyText: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl border overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-left">
+        <thead className="bg-gray-50">
           <tr>
-            <th className="px-3 py-2">Name</th>
-            <th className="px-3 py-2">SKU</th>
-            <th className="px-3 py-2">Stock</th>
-            <th className="px-3 py-2 text-right">Price</th>
+            {columns.map((c) => (
+              <th key={c} className="px-3 py-2 text-left">
+                {c}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map(r => (
-            <tr key={r.id || r.sku} className="border-t">
-              <td className="px-3 py-2">{r.name}</td>
-              <td className="px-3 py-2">{r.sku}</td>
-              <td className="px-3 py-2">{r.stock}</td>
-              <td className="px-3 py-2 text-right">₹{r.unitPrice.toFixed(2)}</td>
+          {rows.length ? (
+            rows.map((r, i) => (
+              <tr key={i} className="border-t">
+                {r.map((c, j) => (
+                  <td key={j} className="px-3 py-2">
+                    {c}
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td
+                colSpan={columns.length}
+                className="px-3 py-6 text-center text-gray-500"
+              >
+                {emptyText}
+              </td>
             </tr>
-          ))}
-          {rows.length === 0 && <tr><td className="px-3 py-6 text-center text-gray-500" colSpan={4}>No products</td></tr>}
+          )}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-// Inline Movement
-function MovementInline() {
-  const [from, setFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); d.setHours(0, 0, 0, 0); return d; });
-  const [to, setTo] = useState(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; });
-  const [rows, setRows] = useState<Array<{ productId: string; name: string; sku: string; category?: string; qtyIn: number; qtyOut: number; net: number }>>([]);
-  const [loading, setLoading] = useState(false);
-  async function run() {
-    setLoading(true);
-    try {
-      const data = await aggregateInventoryMovement(from.toISOString(), to.toISOString());
-      setRows(data);
-    } finally { setLoading(false); }
-  }
-  useEffect(() => { run(); }, []);
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-          <label className="text-sm text-gray-600">From</label>
-          <input type="datetime-local" className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={toIsoDateTimeLocal(from)} onChange={(e) => setFrom(new Date(e.target.value))} />
-        </div>
-        <div>
-          <label className="text-sm text-gray-600">To</label>
-          <input type="datetime-local" className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={toIsoDateTimeLocal(to)} onChange={(e) => setTo(new Date(e.target.value))} />
-        </div>
-        <div className="flex items-end">
-          <button className="px-3 py-2 rounded-md border bg-background w-full" onClick={run} disabled={loading}>{loading ? 'Loading…' : 'Run'}</button>
-        </div>
-      </div>
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left">
-            <tr>
-              <th className="px-3 py-2">Product</th>
-              <th className="px-3 py-2">SKU</th>
-              <th className="px-3 py-2">Category</th>
-              <th className="px-3 py-2 text-right">Qty In</th>
-              <th className="px-3 py-2 text-right">Qty Out</th>
-              <th className="px-3 py-2 text-right">Net</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(r => (
-              <tr key={r.productId} className="border-t">
-                <td className="px-3 py-2">{r.name}</td>
-                <td className="px-3 py-2">{r.sku}</td>
-                <td className="px-3 py-2">{r.category || '—'}</td>
-                <td className="px-3 py-2 text-right">{r.qtyIn}</td>
-                <td className="px-3 py-2 text-right">{r.qtyOut}</td>
-                <td className="px-3 py-2 text-right">{r.net}</td>
-              </tr>
-            ))}
-            {rows.length === 0 && <tr><td className="px-3 py-6 text-center text-gray-500" colSpan={6}>No movements</td></tr>}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }

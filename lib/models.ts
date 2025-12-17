@@ -246,3 +246,19 @@ export function categoryCode(cat?: string): string {
   if (!trimmed) return 'GEN';
   return trimmed.slice(0, 3).toUpperCase();
 }
+
+
+export type UnifiedCsvRow = {
+  reportType: 'ACCOUNTING' | 'GSTR1_B2B' | 'GSTR1_B2CL' | 'GSTR1_HSN';
+  date?: string;
+  invoiceNumber?: string;
+  gstin?: string;
+  sku?: string;
+  hsn?: string;
+  taxableValue?: number;
+  taxRate?: number;
+  taxAmount?: number;
+  invoiceValue?: number;
+  paymentMode?: string;
+  placeOfSupply?: string;
+};
