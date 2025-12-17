@@ -35,7 +35,7 @@ const Sidebar = () => {
         href={item.href}
         className={cn(
           "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors border",
-          "bg-gray-100 shadow-sm gap-4 text-center border-transparent",
+          "bg-gray-100 shadow-sm gap-4 text-center border-transparent m-4",
           isActive
             ? "bg-primary text-primary-foreground"
             : "text-muted-foreground hover:bg-muted hover:text-foreground"
