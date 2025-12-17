@@ -14,6 +14,15 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const DEFAULT_ROLE: UserRole = "cashier";
+
+const ROUTES = {
+  LOGIN: "/login",
+  ADMIN_HOME: "/dashboard",
+  CASHIER_HOME: "/pos",
+  CASHIER_ALLOWED: ["/pos", "/invoices", "/settings/barcodes/print"],
+} as const;
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
@@ -21,29 +30,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (!firebaseAuth) {
-      // Firebase not initialized; skip auth wiring but render app
       setLoading(false);
       return;
     }
+
     const unsub = listenToAuthState(async (u) => {
       setUser(u);
       if (u) {
         try {
-          // Ensure user doc exists, then fetch role
           await ensureUserDocument(u);
-          const r = await getUserRole(u.uid);
-          // Default conservatively to 'cashier' if role not found to avoid exposing admin UI
-          setRole((r as UserRole | null) || 'cashier');
+          const userRole = await getUserRole(u.uid);
+          setRole((userRole as UserRole) || DEFAULT_ROLE);
         } catch (err) {
-          console.error("Failed to ensure user document or get role:", err);
-          // On error, restrict UI to cashier capabilities by default
-          setRole('cashier');
+          console.error("Auth error:", err);
+          setRole(DEFAULT_ROLE);
         }
       } else {
         setRole(null);
       }
       setLoading(false);
     });
+
     return () => unsub();
   }, []);
 
@@ -60,11 +67,6 @@ export function useAuth() {
   return ctx;
 }
 
-const LOGIN_PATH = "/login";
-const ADMIN_HOME = "/dashboard";
-const CASHIER_HOME = "/pos";
-const CASHIER_ALLOWED_PREFIXES = ["/pos", "/invoices", "/settings/barcodes/print"];
-
 export const AuthRedirector: React.FC = () => {
   const { user, role, loading } = useAuth();
   const router = useRouter();
@@ -74,27 +76,27 @@ export const AuthRedirector: React.FC = () => {
     if (loading) return;
 
     if (!user) {
-      if (pathname !== LOGIN_PATH) {
-        router.replace(LOGIN_PATH);
+      if (pathname !== ROUTES.LOGIN) {
+        router.replace(ROUTES.LOGIN);
       }
       return;
     }
 
-    if (role === "admin") {
-      if (pathname === "/" || pathname === LOGIN_PATH) {
-        router.replace(ADMIN_HOME);
-      }
+    if (role === "admin" && ["/", ROUTES.LOGIN].includes(pathname)) {
+      router.replace(ROUTES.ADMIN_HOME);
       return;
     }
 
     if (role === "cashier") {
-      if (pathname === LOGIN_PATH) {
-        router.replace(CASHIER_HOME);
+      if (pathname === ROUTES.LOGIN) {
+        router.replace(ROUTES.CASHIER_HOME);
         return;
       }
-      const allowed = CASHIER_ALLOWED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-      if (!allowed) {
-        router.replace(CASHIER_HOME);
+      const isAllowed = ROUTES.CASHIER_ALLOWED.some(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+      );
+      if (!isAllowed) {
+        router.replace(ROUTES.CASHIER_HOME);
       }
     }
   }, [user, role, loading, router, pathname]);
