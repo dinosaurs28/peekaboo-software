@@ -23,7 +23,9 @@ export interface CustomerDoc extends BaseDoc {
   phone?: string;
   email?: string;
   notes?: string;
-  kidsDob?: string; // ISO date for child's DOB (optional)
+  kidsDob?: string;
+  gstin?: string;
+  active: boolean;
   loyaltyPoints?: number;
   totalSpend?: number;
 }
