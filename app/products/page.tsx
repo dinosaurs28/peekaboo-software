@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Sidebar } from "@/components/layout/sidebar";
+import Sidebar from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { listProducts, deleteProduct, updateProduct } from "@/lib/products";
 import type { ProductDoc } from "@/lib/models";
