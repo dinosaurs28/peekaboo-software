@@ -207,9 +207,11 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen w-full bg-gray-50">
+      <div className="flex w-full h-screen bg-slate-50">
+        <div className="flex h-[100%]">
         <Sidebar />
-        <div className="flex flex-col flex-1">
+      </div>
+        <div className="flex flex-1 flex-col overflow-hidden md:ml-1">
           <Topbar />
           <main className="flex-1 p-8 space-y-6">
             <div className="animate-pulse space-y-4">

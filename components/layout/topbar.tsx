@@ -57,7 +57,8 @@ export function Topbar() {
   }, []);
 
   return (
-    <header className="h-14 border-b flex items-center gap-4 px-4 bg-background relative">
+    <header 
+    className="h-14 flex items-center gap-4 px-4 bg-background relative shadow-sm z-10">
       <div className="flex-1 flex justify-center">
         <div className="relative max-w-sm w-full">
           <Input placeholder="Search..." 
@@ -120,16 +121,16 @@ export function Topbar() {
           onClick={() => setOpen((v) => !v)}
           aria-haspopup="menu"
           aria-expanded={open}
-          className="rounded-full"
+          className="rounded-full border"
         >
           <Avatar fallback={(user?.email?.[0] || "U").toUpperCase()} />
         </button>
         {open && (
-          <DropdownPanel className="absolute right-0 w-40">
-            <div className="px-3 py-2 text-xs text-muted-foreground border-b">
+          <DropdownPanel className="absolute right-0 w-40 ">
+            <div className="px-3 py-2 text-xs text-muted-foreground bg-gray-50">
               {user?.email || "Signed in"}
             </div>
-            <div className="p-2">
+            <div className="p-2 bg-gray-50">
               <Button variant="outline" className="w-full justify-start" onClick={handleSignOut}>
                 Sign out
               </Button>
