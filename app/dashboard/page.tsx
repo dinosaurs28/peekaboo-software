@@ -60,11 +60,11 @@ export default function DashboardPage() {
   const customersToTs = useMemo(() => (toDate ? Timestamp.fromDate(new Date(`${toDate}T23:59:59.999Z`)) : undefined), [toDate]);
 
   // If not authenticated (after loading), redirect to login
-  // useEffect(() => {
-  //   if (!loading && !user) {
-  //     window.location.href = "/login";
-  //   }
-  // }, [user, loading]);
+  useEffect(() => {
+    if (!loading && !user) {
+      window.location.href = "/login";
+    }
+  }, [user, loading]);
 
   // Load product cost map once
   useEffect(() => {
