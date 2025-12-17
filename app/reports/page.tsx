@@ -41,8 +41,8 @@ export default function ReportsIndexPage() {
         <Topbar />
         <main className="flex-1 p-8 overflow-auto">
           <div className="max-w-6xl mx-auto space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+            <div className="border-b pb-2">
+              <h1 className="text-4xl font-serif font-bold text-gray-900">Reports</h1>
               <p className="text-sm text-gray-500 mt-1">
                 Analyze sales, payments, inventory and export accounting & GST
                 data.
