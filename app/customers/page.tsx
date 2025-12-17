@@ -82,11 +82,11 @@ export default function CustomersPage() {
   // if (!user) return null;
 
   return (
-    <div className="flex min-h-screen w-full bg-gray-50 text-foreground">
+    <div className="flex w-full h-screen bg-slate-50">
       <div className="flex h-[100%]">
         <Sidebar />
       </div>
-      <div className="flex flex-col flex-1">
+      <div className="flex flex-1 flex-col overflow-hidden md:ml-1">
         <Topbar />
         <main className="flex-1 p-8 space-y-6">
           <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
