@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import type { CustomerDoc, InvoiceDoc } from "@/lib/models";
 import { toInvoiceDoc } from "@/lib/invoices";
+import { IoArrowBack } from "react-icons/io5";
 
 interface Metrics {
   visits: number;
@@ -164,14 +165,14 @@ export default function CustomerDetailPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <button
-                className="h-9 px-3 border rounded-md text-sm hover:bg-muted"
+                className="h-9 px-3 text-sm cursor-pointer"
                 onClick={() => {
                   window.history.back();
                 }}
               >
-                ← Back
+                <IoArrowBack size={20} />
               </button>
-              <h1 className="text-xl font-semibold">Customer</h1>
+              <h1 className="text-4xl font-serif font-semibold">Customer</h1>
               <div />
             </div>
 

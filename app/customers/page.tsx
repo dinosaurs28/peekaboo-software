@@ -92,7 +92,7 @@ export default function CustomersPage() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar />
         <main className="flex-1 p-8 space-y-6 overflow-y-auto">
-          <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
+          <h1 className="text-4xl font-serif font-bold text-gray-900">Customers</h1>
 
           <div className="bg-white rounded-lg shadow-sm p-4">
             <input
