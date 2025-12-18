@@ -392,6 +392,58 @@ export async function buildGstr1HsnCsv(
   return [["Summary For HSN"], [], header, ...rows].map(formatRow).join("\n");
 }
 
+/* =====================================================
+b2bcs  ROW TYPES
+====================================================== */
+export async function buildGstr1B2csCsv(
+  fromIso: string,
+  toIso: string
+): Promise<string> {
+  const [invoices, customers] = await Promise.all([
+    listInvoicesInRange(fromIso, toIso),
+    listCustomers(),
+  ]);
+
+  const customerMap = new Map(customers.map((c) => [c.id, c]));
+  
+  // B2CS requires aggregation by (POS + Rate)
+  const b2csMap = new Map<string, { pos: string; rate: number; taxable: number }>();
+
+  for (const inv of invoices) {
+    const cust = inv.customerId ? customerMap.get(inv.customerId) : undefined;
+    const gstin = cust?.gstin?.trim().toUpperCase();
+
+    // Skip if it's B2B (has valid GSTIN)
+    if (gstin && isValidGstin(gstin)) continue;
+
+    // Skip if it's B2CL (Unregistered AND > 2.5 Lakhs)
+    if (inv.grandTotal > 250000) continue;
+
+    for (const item of inv.items) {
+      const rate = Number(item.taxRatePct || 0);
+      const pos = inv.placeOfSupply || DEFAULT_PLACE_OF_SUPPLY;
+      const { base } = splitInclusive(item.unitPrice * item.quantity, rate);
+
+      const key = `${pos}_${rate}`;
+      const existing = b2csMap.get(key) || { pos, rate, taxable: 0 };
+      existing.taxable += base;
+      b2csMap.set(key, existing);
+    }
+  }
+
+  const header = ["Type", "Place Of Supply", "Rate", "Taxable Value", "Cess Amount", "E-Commerce GSTIN"];
+  const rows = Array.from(b2csMap.values()).map(v => [
+    "OE", // Other than E-commerce
+    v.pos,
+    v.rate.toFixed(2),
+    v.taxable.toFixed(2),
+    "",
+    ""
+  ]);
+
+  return [["Summary For B2CS(7)"], [], header, ...rows].map(formatRow).join("\n");
+}
+
 /* ======================================================
    ROW BUILDERS
 ====================================================== */
