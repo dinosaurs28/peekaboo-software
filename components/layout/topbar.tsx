@@ -28,7 +28,11 @@ export function Topbar() {
   }, []);
 
   const handleClickOutside = useCallback(
-    (e: MouseEvent, ref: React.RefObject<HTMLDivElement | null>, setter: (v: boolean) => void) => {
+    (
+      e: MouseEvent,
+      ref: React.RefObject<HTMLDivElement | null>,
+      setter: (v: boolean) => void
+    ) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setter(false);
       }
@@ -38,7 +42,8 @@ export function Topbar() {
 
   useEffect(() => {
     if (!notifOpen) return;
-    const handler = (e: MouseEvent) => handleClickOutside(e, notifRef, setNotifOpen);
+    const handler = (e: MouseEvent) =>
+      handleClickOutside(e, notifRef, setNotifOpen);
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [notifOpen, handleClickOutside]);
@@ -57,13 +62,14 @@ export function Topbar() {
   }, []);
 
   return (
-    <header
-      className="h-14 border-b flex items-center gap-4 px-4 bg-background relative"
-    >
-      <div className="flex-1 flex items-center gap-4">
-        <div className="relative max-w-sm w-full">
-          <Input placeholder="Search..."
-            className="pl-4 rounded-md shadow-sm outline-none focus:ring focus:ring-ring placeholder:focus:outline-none" />
+    <header className="h-14 border-b flex items-center gap-4 px-4 bg-background relative">
+      <div className="flex-1 flex items-center gap-5">
+        <div className="relative max-w-sm w-full mx-auto">
+          <Input
+            placeholder="Search..."
+            className="pl-4 rounded-full border-2 border-gray-300 shadow-md 
+            outline-none"
+          />
         </div>
       </div>
 
@@ -86,20 +92,33 @@ export function Topbar() {
 
         {notifOpen && (
           <DropdownPanel className="absolute right-0 w-80">
-            <div className="px-3 py-2 border-b text-sm font-medium">Notifications</div>
+            <div className="px-3 py-2 border-b text-sm font-medium">
+              Notifications
+            </div>
             <div className="max-h-72 overflow-auto p-2">
               {lowItems.length === 0 ? (
-                <div className="text-xs text-muted-foreground px-2 py-4">No low stock items.</div>
+                <div className="text-xs text-muted-foreground px-2 py-4">
+                  No low stock items.
+                </div>
               ) : (
                 <ul className="space-y-2">
                   {lowItems.map((product) => (
-                    <li key={product.id} className="flex items-start justify-between gap-2 text-sm">
+                    <li
+                      key={product.id}
+                      className="flex items-start justify-between gap-2 text-sm"
+                    >
                       <div className="min-w-0">
                         <div className="font-medium truncate">Low Stock</div>
-                        <div className="text-xs text-muted-foreground truncate">{product.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {product.name}
+                        </div>
                       </div>
-                      <Link href={isAdmin ? `/products/${product.id}` : "/products"}>
-                        <Button size="sm" variant="outline">View</Button>
+                      <Link
+                        href={isAdmin ? `/products/${product.id}` : "/products"}
+                      >
+                        <Button size="sm" variant="outline">
+                          View
+                        </Button>
                       </Link>
                     </li>
                   ))}
@@ -108,7 +127,9 @@ export function Topbar() {
             </div>
             <div className="p-2 border-t text-right">
               <Link href="/products">
-                <Button size="sm" variant="ghost">View all</Button>
+                <Button size="sm" variant="ghost">
+                  View all
+                </Button>
               </Link>
             </div>
           </DropdownPanel>
@@ -131,7 +152,11 @@ export function Topbar() {
               {user?.email || "Signed in"}
             </div>
             <div className="p-2 bg-gray-50">
-              <Button variant="outline" className="w-full justify-start" onClick={handleSignOut}>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={handleSignOut}
+              >
                 Sign out
               </Button>
             </div>
