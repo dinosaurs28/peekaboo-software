@@ -64,6 +64,7 @@ export interface InvoiceDoc extends BaseDoc {
   paymentMethod: 'cash' | 'card' | 'upi' | 'wallet';
   paymentReferenceId?: string;
   balanceDue: number;
+  placeOfSupply?: string; // for GST
   cashierUserId: string;
   cashierName?: string;
   status: 'paid' | 'partial' | 'unpaid' | 'void';
