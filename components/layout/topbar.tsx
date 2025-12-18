@@ -160,7 +160,8 @@ export function Topbar() {
           onClick={() => setOpen((v) => !v)}
           aria-haspopup="menu"
           aria-expanded={open}
-          className="rounded-full"
+          className="rounded-full border-2 
+          border-gray-300 hover:border-gray-400 focus:outline-none"
         >
           <Avatar fallback={(user?.email?.[0] || "U").toUpperCase()} />
         </button>
