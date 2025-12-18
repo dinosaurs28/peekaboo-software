@@ -40,9 +40,9 @@ export default function ReportsIndexPage() {
       <div className="flex flex-1 flex-col">
         <Topbar />
         <main className="flex-1 p-8 overflow-auto">
-          <div className="max-w-6xl mx-auto space-y-6">
+          <div className="max-w-7xl mx-auto space-y-6">
             <div className="border-b pb-2">
-              <h1 className="text-4xl font-serif font-bold text-gray-900">Reports</h1>
+              <h1 className="text-5xl font-serif font-bold text-gray-900">Reports</h1>
               <p className="text-sm text-gray-500 mt-1">
                 Analyze sales, payments, inventory and export accounting & GST
                 data.
@@ -80,7 +80,7 @@ export default function ReportsIndexPage() {
             </nav>
 
             {/* Content */}
-            <div className="pt-2">
+            <div className="pt-2 shadow-sm">
               {tab === "sales" && <SalesInline />}
               {tab === "payments" && <PaymentsInline />}
               {tab === "profitloss" && <ProfitLossInline />}
