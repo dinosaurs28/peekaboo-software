@@ -71,7 +71,7 @@ export default function SettingsIndexPage() {
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar />
-        <main className="flex-1 overflow-auto p-8">
+        <main className="flex-1 overflow-auto p-8 bg-gray-100">
           <div className="max-w-7xl mx-auto space-y-8">
             <div className="space-y-2">
               <h1 className="text-4xl font-bold font-serif text-gray-900">Settings</h1>
@@ -101,7 +101,7 @@ export default function SettingsIndexPage() {
               </ul>
             </nav>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
               <Section />
             </div>
           </div>
