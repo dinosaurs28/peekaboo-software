@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { DropdownPanel } from "@/components/ui/dropdown-panel";
 import { observeLowStockProducts } from "@/lib/products";
 import type { ProductDoc } from "@/lib/models";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export function Topbar() {
+  const router = useRouter();
   const { user, role } = useAuth();
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -84,18 +85,26 @@ export function Topbar() {
         >
           <Bell className="h-5 w-5" />
           {isAdmin && lowCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] leading-4 text-center">
+            <span
+              className="absolute -top-0.5 -left-0.7 min-w-[16px] h-4
+            rounded-full text-destructive-foreground text-[10px] 
+            font-medium leading-4 text-center bg-red-500 opacity-80 
+            text-white"
+            >
               {lowCount}
             </span>
           )}
         </button>
 
         {notifOpen && (
-          <DropdownPanel className="absolute right-0 w-80">
-            <div className="px-3 py-2 border-b text-sm font-medium">
+          <DropdownPanel className="absolute right-2 w-80">
+            <div
+              className="px-3 py-2 text-sm text-muted-foreground 
+            border-b font-medium bg-gray-50"
+            >
               Notifications
             </div>
-            <div className="max-h-72 overflow-auto p-2">
+            <div className="max-h-72 overflow-auto p-2 bg-gray-50">
               {lowItems.length === 0 ? (
                 <div className="text-xs text-muted-foreground px-2 py-4">
                   No low stock items.
@@ -113,24 +122,33 @@ export function Topbar() {
                           {product.name}
                         </div>
                       </div>
-                      <Link
-                        href={isAdmin ? `/products/${product.id}` : "/products"}
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-blue-700"
+                        onClick={() =>
+                          isAdmin
+                            ? router.push(`/products/${product.id}`)
+                            : router.push("/products")
+                        }
                       >
-                        <Button size="sm" variant="outline">
-                          View
-                        </Button>
-                      </Link>
+                        View
+                      </Button>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
-            <div className="p-2 border-t text-right">
-              <Link href="/products">
-                <Button size="sm" variant="ghost">
-                  View all
-                </Button>
-              </Link>
+            <div className="p-2 border-t text-right bg-gray-50">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-blue-700 hover:text-blue-600"
+                onClick={() => router.push("/products")}
+              >
+                View all
+              </Button>
             </div>
           </DropdownPanel>
         )}
