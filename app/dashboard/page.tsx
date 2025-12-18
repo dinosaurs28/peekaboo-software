@@ -312,8 +312,8 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-6 max-w-7xl">
               {/* Header */}
-              <div className="text-center">
-                <h1 className="text-4xl text-center font-bold text-gray-900 font-serif">
+              <div className="text-start">
+                <h1 className="text-5xl font-bold text-gray-900 font-serif">
                   Dashboard
                 </h1>
                 <p className="text-sm text-gray-500 mt-1 ">
