@@ -74,20 +74,20 @@ export default function SettingsIndexPage() {
         <main className="flex-1 overflow-auto p-8">
           <div className="max-w-7xl mx-auto space-y-8">
             <div className="space-y-2">
-              <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+              <h1 className="text-4xl font-bold font-serif text-gray-900">Settings</h1>
               <p className="text-sm text-gray-600">
                 Manage your store configuration and tools.
               </p>
             </div>
 
-            <nav className="border-b border-gray-200 bg-white rounded-t-lg">
+            <nav className="border-b border-gray-200 rounded-t-lg">
               <ul className="flex gap-1 px-4">
                 {items.map((item) => (
                   <li key={item.key}>
                     <button
                       type="button"
                       onClick={() => setTab(item.key)}
-                      className={`px-4 py-3 text-sm font-medium transition-all ${
+                      className={`px-4 py-3 text-sm font-medium transition-all cursor-pointer ${
                         tab === item.key
                           ? "text-blue-600 border-b-2 border-blue-600"
                           : "text-gray-600 hover:text-gray-900 border-b-2 border-transparent"
@@ -101,7 +101,7 @@ export default function SettingsIndexPage() {
               </ul>
             </nav>
 
-            <div className="bg-white rounded-b-lg shadow-sm p-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
               <Section />
             </div>
           </div>

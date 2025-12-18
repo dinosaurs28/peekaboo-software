@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createCategory } from "@/lib/categories";
 import { useToast } from "@/components/ui/toast";
+import { IoArrowBack } from "react-icons/io5";
 
 export default function NewCategoryPage() {
   const { user, role, loading } = useAuth();
@@ -17,9 +18,21 @@ export default function NewCategoryPage() {
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
   if (loading) return <div className="p-6">Loading…</div>;
-  if (!user || role !== 'admin') return <div className="p-6 text-sm text-muted-foreground">Admin access required.</div>;
+  if (!user || role !== "admin")
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        Admin access required.
+      </div>
+    );
   async function onSave() {
-    if (!name || !code) { toast({ title: 'Validation', description: 'Name and Code are required', variant: 'destructive' }); return; }
+    if (!name || !code) {
+      toast({
+        title: "Validation",
+        description: "Name and Code are required",
+        variant: "destructive",
+      });
+      return;
+    }
     setBusy(true);
     try {
       const parsedTax = parseFloat(defaultTaxRatePct);
@@ -29,38 +42,64 @@ export default function NewCategoryPage() {
         description: description || undefined,
         active,
         defaultHsnCode: defaultHsnCode.trim() || undefined,
-        defaultTaxRatePct: defaultTaxRatePct.trim() === "" || Number.isNaN(parsedTax) ? undefined : parsedTax,
+        defaultTaxRatePct:
+          defaultTaxRatePct.trim() === "" || Number.isNaN(parsedTax)
+            ? undefined
+            : parsedTax,
       });
-      toast({ title: 'Category created', description: `${name} (${code})`, variant: 'success' });
+      toast({
+        title: "Category created",
+        description: `${name} (${code})`,
+        variant: "success",
+      });
       window.location.href = "/settings/categories";
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      toast({ title: 'Save failed', description: msg, variant: 'destructive' });
-    } finally { setBusy(false); }
+      toast({ title: "Save failed", description: msg, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <button className="h-9 px-3 border rounded-md text-sm" onClick={() => { window.location.href = "/settings/categories"; }}>← Back</button>
+        <Button
+          variant="link"
+          onClick={() => (window.location.href = "/settings/categories")}
+          className="h-12 cursor-pointer"
+        >
+          <IoArrowBack className="mr-2"/>
+        </Button>
         <h1 className="text-xl font-semibold">New Category</h1>
         <div />
       </div>
       <div className="border rounded-md p-4 space-y-3 max-w-xl">
         <div>
           <label className="text-sm">Name</label>
-          <Input value={name} onChange={e => setName(e.target.value)} />
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div>
           <label className="text-sm">Code</label>
-          <Input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="CLO" />
+          <Input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="CLO"
+          />
         </div>
         <div>
           <label className="text-sm">Description (optional)</label>
-          <Input value={description} onChange={e => setDescription(e.target.value)} />
+          <Input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
         </div>
         <div>
           <label className="text-sm">Default HSN Code (optional)</label>
-          <Input value={defaultHsnCode} onChange={e => setDefaultHsnCode(e.target.value)} placeholder="e.g., 9503" />
+          <Input
+            value={defaultHsnCode}
+            onChange={(e) => setDefaultHsnCode(e.target.value)}
+            placeholder="e.g., 9503"
+          />
         </div>
         <div>
           <label className="text-sm">Default GST % (optional)</label>
@@ -68,15 +107,24 @@ export default function NewCategoryPage() {
             type="number"
             step="0.01"
             value={defaultTaxRatePct}
-            onChange={e => setDefaultTaxRatePct(e.target.value)}
+            onChange={(e) => setDefaultTaxRatePct(e.target.value)}
             placeholder="e.g., 12"
           />
         </div>
         <div className="flex items-center gap-2">
-          <input id="active" type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} />
-          <label htmlFor="active" className="text-sm">Active</label>
+          <input
+            id="active"
+            type="checkbox"
+            checked={active}
+            onChange={(e) => setActive(e.target.checked)}
+          />
+          <label htmlFor="active" className="text-sm">
+            Active
+          </label>
         </div>
-        <Button onClick={onSave} disabled={busy}>Save</Button>
+        <Button onClick={onSave} disabled={busy}>
+          Save
+        </Button>
       </div>
     </div>
   );
