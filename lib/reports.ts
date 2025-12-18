@@ -8,11 +8,7 @@ import {
   where,
   Timestamp,
 } from "firebase/firestore";
-import type {
-  InvoiceDoc,
-  InventoryLogDoc,
-  UnifiedCsvRow,
-} from "@/lib/models";
+import type { InvoiceDoc, InventoryLogDoc, UnifiedCsvRow } from "@/lib/models";
 import { toInvoiceDoc } from "@/lib/invoices";
 import { listProducts } from "@/lib/products";
 import { listCustomers } from "@/lib/customers";
@@ -38,8 +34,7 @@ export type MovementRow = {
    CONSTANTS
 ====================================================== */
 
-const GSTIN_REGEX =
-  /\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}/;
+const GSTIN_REGEX = /\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}/;
 
 const DEFAULT_PLACE_OF_SUPPLY = "29-Karnataka";
 
@@ -47,11 +42,9 @@ const DEFAULT_PLACE_OF_SUPPLY = "29-Karnataka";
    HELPERS
 ====================================================== */
 
-const isValidGstin = (value: string): boolean =>
-  GSTIN_REGEX.test(value);
+const isValidGstin = (value: string): boolean => GSTIN_REGEX.test(value);
 
-const tsFromIso = (iso: string): Timestamp =>
-  Timestamp.fromDate(new Date(iso));
+const tsFromIso = (iso: string): Timestamp => Timestamp.fromDate(new Date(iso));
 
 const escapeCSV = (value: string): string => {
   if (value.includes(",") || value.includes('"') || value.includes("\n")) {
@@ -84,10 +77,7 @@ export async function listInvoicesInRange(
   );
 }
 
-export async function listInventoryLogsInRange(
-  fromIso: string,
-  toIso: string
-) {
+export async function listInventoryLogsInRange(fromIso: string, toIso: string) {
   if (!db) return [];
   const qy = query(
     collection(db, "InventoryLogs"),
@@ -155,6 +145,25 @@ export async function buildAccountingCsv(
   return [header, ...rows].map(formatRow).join("\n");
 }
 
+// helpers for tax calculations
+function formatGstDate(iso: string): string {
+  const d = new Date(iso);
+  return d
+    .toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+    })
+    .replace(/ /g, "-");
+}
+
+function splitInclusive(price: number, taxRatePct: number) {
+  const r = (taxRatePct || 0) / 100;
+  if (r <= 0) return { base: price, gst: 0 };
+  const base = price / (1 + r);
+  return { base, gst: price - base };
+}
+
 /* ======================================================
    GSTR-1 CSV BUILDERS
 ====================================================== */
@@ -168,7 +177,7 @@ export async function buildGstr1B2bCsv(
     listCustomers(),
   ]);
 
-  const customerMap = new Map(customers.map(c => [c.id, c]));
+  const customerMap = new Map(customers.map((c) => [c.id, c]));
 
   const header = [
     "GSTIN/UIN of Recipient",
@@ -188,27 +197,29 @@ export async function buildGstr1B2bCsv(
   const rows: (string | number)[][] = [];
 
   for (const inv of invoices) {
-    const cust = inv.customerId
-      ? customerMap.get(inv.customerId)
-      : undefined;
+    const cust = inv.customerId ? customerMap.get(inv.customerId) : undefined;
 
     const gstin = cust?.gstin?.trim().toUpperCase();
     if (!gstin || !isValidGstin(gstin)) continue;
 
     for (const item of inv.items) {
+      const rate = Number(item.taxRatePct || 0);
+      const lineValue = item.unitPrice * item.quantity;
+      const { base } = splitInclusive(lineValue, rate);
+
       rows.push([
         gstin,
         inv.invoiceNumber,
-        inv.issuedAt.slice(0, 10),
+        formatGstDate(inv.issuedAt),
         inv.grandTotal.toFixed(2),
         DEFAULT_PLACE_OF_SUPPLY,
         "N",
-        item.taxRatePct || "",
+        "",
         "Regular",
         "",
-        item.taxRatePct || "",
-        (item.unitPrice * item.quantity).toFixed(2),
-        ""
+        rate.toFixed(2),
+        base.toFixed(2),
+        "",
       ]);
     }
   }
@@ -216,8 +227,10 @@ export async function buildGstr1B2bCsv(
   return [header, ...rows].map(formatRow).join("\n");
 }
 
-
-export async function buildGstr1B2clCsv(fromIso: string, toIso: string) {
+export async function buildGstr1B2clCsv(
+  fromIso: string,
+  toIso: string
+): Promise<string> {
   const [invoices, customers] = await Promise.all([
     listInvoicesInRange(fromIso, toIso),
     listCustomers(),
@@ -225,98 +238,157 @@ export async function buildGstr1B2clCsv(fromIso: string, toIso: string) {
 
   const customerMap = new Map(customers.map((c) => [c.id, c]));
 
+  // Aggregate by GST rate
+  const rateMap = new Map<number, number>();
+
+  for (const inv of invoices) {
+    // B2CL condition: invoice value > 2.5L
+    if (inv.grandTotal <= 250000) continue;
+
+    const cust = inv.customerId ? customerMap.get(inv.customerId) : undefined;
+
+    // Skip if customer has GSTIN (then it's B2B)
+    if (cust?.gstin && isValidGstin(cust.gstin)) continue;
+
+    for (const item of inv.items) {
+      const rate = Number(item.taxRatePct || 0);
+      if (rate <= 0) continue;
+
+      const lineValue = item.unitPrice * item.quantity;
+      const { base } = splitInclusive(lineValue, rate);
+
+      rateMap.set(rate, (rateMap.get(rate) || 0) + base);
+    }
+  }
+
   const header = [
     "Applicable % of Tax Rate",
     "Rate",
     "Taxable Value",
     "Cess Amount",
-    "GSTIN/UIN of Recipient",
+    "E-Commerce GSTIN",
   ];
 
-  const rows = invoices.flatMap((inv) => {
-    const cust = inv.customerId
-      ? customerMap.get(inv.customerId)
-      : undefined;
-    if (cust?.email && isValidGstin(cust.email)) return [];
+  const rows: (string | number)[][] = [];
 
-    return inv.items.map((item) => [
-      item.taxRatePct,
-      item.taxRatePct || "",
-      (item.unitPrice * item.quantity).toFixed(2),
-      "",
-      cust?.phone || "",
-    ]);
-  });
+  for (const [rate, taxableValue] of Array.from(rateMap.entries()).sort(
+    (a, b) => a[0] - b[0]
+  )) {
+    rows.push(["", rate.toFixed(2), taxableValue.toFixed(2), "", ""]);
+  }
 
   return [header, ...rows].map(formatRow).join("\n");
 }
 
-export async function buildGstr1HsnCsv(fromIso: string, toIso: string) {
-  const [invoices, products] = await Promise.all([
-    listInvoicesInRange(fromIso, toIso),
-    listProducts(),
-  ]);
+function splitGst(taxableValue: number, rate: number, isInterState: boolean) {
+  const gst = (taxableValue * rate) / 100;
+
+  if (isInterState) {
+    return {
+      igst: gst,
+      cgst: 0,
+      sgst: 0,
+    };
+  }
+
+  return {
+    igst: 0,
+    cgst: gst / 2,
+    sgst: gst / 2,
+  };
+}
+
+export async function buildGstr1HsnCsv(
+  fromIso: string,
+  toIso: string
+): Promise<string> {
+  const invoices = await listInvoicesInRange(fromIso, toIso);
+  const products = await listProducts();
+
+  const productMap = new Map(products.map((p) => [p.id, p]));
 
   type HsnAgg = {
     description: string;
-    totalQty: number;
+    uqc: string;
+    qty: number;
     totalValue: number;
     taxableValue: number;
-    taxAmount: number;
+    igst: number;
+    cgst: number;
+    sgst: number;
+    cess: number;
   };
 
-  const productMap = new Map(products.map((p) => [p.id, p]));
   const hsnMap = new Map<string, HsnAgg>();
 
   for (const inv of invoices) {
+    const isInterState =
+      !!inv.placeOfSupply && !inv.placeOfSupply.startsWith(DEFAULT_PLACE_OF_SUPPLY);
+
     for (const item of inv.items) {
-      const prod = productMap.get(item.productId);
-      if (!prod) continue;
+      const product = productMap.get(item.productId);
+      if (!product?.hsnCode) continue;
 
-      const hsn = prod.hsnCode || "N/A";
-      const entry =
-        hsnMap.get(hsn) || {
-          description: prod.name,
-          totalQty: 0,
-          totalValue: 0,
-          taxableValue: 0,
-          taxAmount: 0,
-        };
+      const rate = Number(item.taxRatePct || 0);
+      const lineValue = item.unitPrice * item.quantity;
+      const { base } = splitInclusive(lineValue, rate);
 
-      const value = item.unitPrice * item.quantity;
-      const rate = (item.taxRatePct || 0) / 100;
-      const tax = rate > 0 ? value - value / (1 + rate) : 0;
+      const taxSplit = splitGst(base, rate, isInterState);
 
-      entry.totalQty += item.quantity;
-      entry.totalValue += value;
-      entry.taxableValue += value - tax;
-      entry.taxAmount += tax;
+      const agg = hsnMap.get(product.hsnCode) || {
+        description: product.name,
+        uqc: "NOS",
+        qty: 0,
+        totalValue: 0,
+        taxableValue: 0,
+        igst: 0,
+        cgst: 0,
+        sgst: 0,
+        cess: 0,
+      };
 
-      hsnMap.set(hsn, entry);
+      agg.qty += item.quantity;
+      agg.totalValue += lineValue;
+      agg.taxableValue += base;
+      agg.igst += taxSplit.igst;
+      agg.cgst += taxSplit.cgst;
+      agg.sgst += taxSplit.sgst;
+
+      hsnMap.set(product.hsnCode, agg);
     }
   }
 
   const header = [
     "HSN",
     "Description",
+    "UQC",
     "Total Quantity",
     "Total Value",
     "Taxable Value",
-    "Tax Amount",
+    "Integrated Tax Amount",
+    "Central Tax Amount",
+    "State/UT Tax Amount",
+    "Cess Amount",
   ];
 
-  const rows = Array.from(hsnMap.entries()).map(
-    ([hsn, d]) => [
-      hsn,
-      d.description,
-      d.totalQty, // This is already a number
-      d.totalValue.toFixed(2),
-      d.taxableValue.toFixed(2),
-      d.taxAmount.toFixed(2),
-    ]
-  );
+  const rows: (string | number)[][] = [];
 
-  return [header, ...rows].map(formatRow).join("\n");
+  for (const [hsn, v] of hsnMap.entries()) {
+    rows.push([
+      hsn,
+      v.description,
+      v.uqc,
+      v.qty,
+      v.totalValue.toFixed(2),
+      v.taxableValue.toFixed(2),
+      v.igst.toFixed(2),
+      v.cgst.toFixed(2),
+      v.sgst.toFixed(2),
+      v.cess.toFixed(2),
+    ]);
+  }
+
+  return [["Summary For HSN"], [], header, ...rows].map(formatRow).join("\n");
 }
 
 /* ======================================================
@@ -407,8 +479,7 @@ export async function buildGstr1HsnRows(
     .split("\n")
     .slice(1)
     .map((l) => {
-      const [hsn, , , totalValue, taxableValue, taxAmount] =
-        l.split(",");
+      const [hsn, , , totalValue, taxableValue, taxAmount] = l.split(",");
       return {
         reportType: "GSTR1_HSN",
         hsn,
@@ -495,16 +566,15 @@ export async function aggregateInventoryMovement(
     const prod = pmap.get(l.productId);
     if (!prod) continue;
 
-    const row =
-      rowsMap.get(l.productId) || {
-        productId: l.productId,
-        name: prod.name,
-        sku: prod.sku,
-        category: prod.category,
-        qtyIn: 0,
-        qtyOut: 0,
-        net: 0,
-      };
+    const row = rowsMap.get(l.productId) || {
+      productId: l.productId,
+      name: prod.name,
+      sku: prod.sku,
+      category: prod.category,
+      qtyIn: 0,
+      qtyOut: 0,
+      net: 0,
+    };
 
     const delta = Number(l.quantityChange || 0);
     if (delta >= 0) row.qtyIn += delta;
@@ -532,9 +602,10 @@ export function aggregateByPeriod(
     if (period === "day") {
       key = dt.toISOString().slice(0, 10);
     } else if (period === "month") {
-      key = `${dt.getUTCFullYear()}-${String(
-        dt.getUTCMonth() + 1
-      ).padStart(2, "0")}`;
+      key = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(
+        2,
+        "0"
+      )}`;
     } else {
       // ISO week
       const tmp = new Date(
@@ -543,9 +614,7 @@ export function aggregateByPeriod(
       const dayNum = tmp.getUTCDay() || 7;
       tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
       const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
-      const weekNo = Math.ceil(
-        ((+tmp - +yearStart) / 86400000 + 1) / 7
-      );
+      const weekNo = Math.ceil(((+tmp - +yearStart) / 86400000 + 1) / 7);
       key = `${tmp.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
     }
 
@@ -563,7 +632,6 @@ export function aggregateByPeriod(
       total: v.total,
     }));
 }
-
 
 export function aggregatePaymentModes(
   invoices: { paymentMethod: string; grandTotal: number }[]
