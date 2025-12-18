@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import type { CustomerDoc, InvoiceDoc } from "@/lib/models";
 import { toInvoiceDoc } from "@/lib/invoices";
+import { IoArrowBack } from "react-icons/io5";
 
 interface Metrics {
   visits: number;
@@ -68,6 +69,8 @@ export default function CustomerDetailPage() {
           email: typeof data.email === "string" ? data.email : undefined,
           notes: typeof data.notes === "string" ? data.notes : undefined,
           kidsDob: typeof data.kidsDob === "string" ? data.kidsDob : undefined,
+          active: typeof data.active === "boolean" ? data.active : true,
+          gstin: typeof data.gstin === "string" ? data.gstin : undefined,
           loyaltyPoints:
             typeof data.loyaltyPoints === "number"
               ? data.loyaltyPoints
@@ -156,135 +159,135 @@ export default function CustomerDetailPage() {
         <Sidebar />
       </div>
       <div className="flex flex-1 flex-col md:ml-1">
-      <div className="flex flex-col flex-1">
-        <Topbar />
-        <main className="flex-1 p-6 space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <button
-              className="h-9 px-3 border rounded-md text-sm hover:bg-muted"
-              onClick={() => {
-                window.history.back();
-              }}
-            >
-              ← Back
-            </button>
-            <h1 className="text-xl font-semibold">Customer</h1>
-            <div />
-          </div>
+        <div className="flex flex-col flex-1">
+          <Topbar />
+          <main className="flex-1 p-6 space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <button
+                className="h-9 px-3 text-sm cursor-pointer"
+                onClick={() => {
+                  window.history.back();
+                }}
+              >
+                <IoArrowBack size={20} />
+              </button>
+              <h1 className="text-4xl font-serif font-semibold">Customer</h1>
+              <div />
+            </div>
 
-          {customer ? (
-            <div className="space-y-4">
-              {/* Customer Info */}
-              <div className="border rounded-md p-4 space-y-1">
-                <div className="font-medium">{customer.name}</div>
-                <div className="text-sm text-muted-foreground">
-                  {customer.phone || ""}{" "}
-                  {customer.email ? `• ${customer.email}` : ""}
+            {customer ? (
+              <div className="space-y-4">
+                {/* Customer Info */}
+                <div className="border rounded-md p-4 space-y-1">
+                  <div className="font-medium">{customer.name}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {customer.phone || ""}{" "}
+                    {customer.email ? `• ${customer.email}` : ""}
+                  </div>
+                  {customer.kidsDob && (
+                    <div className="text-xs text-muted-foreground">
+                      Kid&apos;s DOB: {customer.kidsDob}
+                    </div>
+                  )}
                 </div>
-                {customer.kidsDob && (
-                  <div className="text-xs text-muted-foreground">
-                    Kid&apos;s DOB: {customer.kidsDob}
+
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <MetricCard
+                    label="Total Spend"
+                    value={`₹${metrics.totalSpend.toFixed(2)}`}
+                  />
+                  <MetricCard label="Visits" value={String(metrics.visits)} />
+                  <MetricCard
+                    label="Last Purchase"
+                    value={
+                      metrics.lastPurchase
+                        ? new Date(metrics.lastPurchase).toLocaleDateString()
+                        : "—"
+                    }
+                  />
+                  <MetricCard
+                    label="Loyalty Points"
+                    value={String(Math.max(0, customer.loyaltyPoints ?? 0))}
+                  />
+                </div>
+
+                {/* Top Items */}
+                {metrics.topItems.length > 0 && (
+                  <div className="border rounded-md p-4">
+                    <div className="text-sm text-muted-foreground mb-2">
+                      Top Items
+                    </div>
+                    <ul className="text-sm list-disc pl-6">
+                      {metrics.topItems.map((item) => (
+                        <li key={item.name}>
+                          {item.name} — {item.qty}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
+            ) : (
+              <div className="text-sm text-red-600">Customer not found</div>
+            )}
 
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <MetricCard
-                  label="Total Spend"
-                  value={`₹${metrics.totalSpend.toFixed(2)}`}
-                />
-                <MetricCard label="Visits" value={String(metrics.visits)} />
-                <MetricCard
-                  label="Last Purchase"
-                  value={
-                    metrics.lastPurchase
-                      ? new Date(metrics.lastPurchase).toLocaleDateString()
-                      : "—"
-                  }
-                />
-                <MetricCard
-                  label="Loyalty Points"
-                  value={String(Math.max(0, customer.loyaltyPoints ?? 0))}
-                />
+            {/* Purchase History Table */}
+            <div className="border rounded-md p-0">
+              <div className="px-4 pt-4 pb-2 text-sm text-muted-foreground">
+                Purchase History
               </div>
-
-              {/* Top Items */}
-              {metrics.topItems.length > 0 && (
-                <div className="border rounded-md p-4">
-                  <div className="text-sm text-muted-foreground mb-2">
-                    Top Items
-                  </div>
-                  <ul className="text-sm list-disc pl-6">
-                    {metrics.topItems.map((item) => (
-                      <li key={item.name}>
-                        {item.name} — {item.qty}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-sm text-red-600">Customer not found</div>
-          )}
-
-          {/* Purchase History Table */}
-          <div className="border rounded-md p-0">
-            <div className="px-4 pt-4 pb-2 text-sm text-muted-foreground">
-              Purchase History
-            </div>
-            <div className="px-4 pb-4 overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-left">
-                  <tr>
-                    <th className="px-3 py-2">When</th>
-                    <th className="px-3 py-2">Invoice #</th>
-                    <th className="px-3 py-2 text-right">Subtotal</th>
-                    <th className="px-3 py-2 text-right">Discount</th>
-                    <th className="px-3 py-2 text-right">Grand Total</th>
-                    <th className="px-3 py-2">Cashier</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="border-t">
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {new Date(invoice.issuedAt).toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2">{invoice.invoiceNumber}</td>
-                      <td className="px-3 py-2 text-right">
-                        ₹{invoice.subtotal.toFixed(2)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        ₹{(invoice.discountTotal ?? 0).toFixed(2)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium">
-                        ₹{invoice.grandTotal.toFixed(2)}
-                      </td>
-                      <td className="px-3 py-2">
-                        {invoice.cashierName || invoice.cashierUserId}
-                      </td>
-                    </tr>
-                  ))}
-                  {invoices.length === 0 && !invoicesPending && (
+              <div className="px-4 pb-4 overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-left">
                     <tr>
-                      <td
-                        className="px-3 py-6 text-center text-muted-foreground"
-                        colSpan={6}
-                      >
-                        No purchases yet.
-                      </td>
+                      <th className="px-3 py-2">When</th>
+                      <th className="px-3 py-2">Invoice #</th>
+                      <th className="px-3 py-2 text-right">Subtotal</th>
+                      <th className="px-3 py-2 text-right">Discount</th>
+                      <th className="px-3 py-2 text-right">Grand Total</th>
+                      <th className="px-3 py-2">Cashier</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {invoices.map((invoice) => (
+                      <tr key={invoice.id} className="border-t">
+                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                          {new Date(invoice.issuedAt).toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2">{invoice.invoiceNumber}</td>
+                        <td className="px-3 py-2 text-right">
+                          ₹{invoice.subtotal.toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          ₹{(invoice.discountTotal ?? 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium">
+                          ₹{invoice.grandTotal.toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {invoice.cashierName || invoice.cashierUserId}
+                        </td>
+                      </tr>
+                    ))}
+                    {invoices.length === 0 && !invoicesPending && (
+                      <tr>
+                        <td
+                          className="px-3 py-6 text-center text-muted-foreground"
+                          colSpan={6}
+                        >
+                          No purchases yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
     </div>
   );
 }

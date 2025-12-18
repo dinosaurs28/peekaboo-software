@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { categoryCode } from "@/lib/models";
 import { listCategories } from "@/lib/categories";
 import type { CategoryDoc } from "@/lib/models";
 import { useToast } from "@/components/ui/toast";
+import { IoArrowBack } from "react-icons/io5";
 
 // Contract:
 // - Admin only access; others redirected to /login or /dashboard
@@ -24,7 +25,9 @@ function encodeBarcode(p: ProductDoc, categories: CategoryDoc[]): string {
   const catName = p.category;
   let code = categoryCode(catName);
   if (catName) {
-    const match = categories.find(c => c.active && c.name.toLowerCase() === catName.toLowerCase());
+    const match = categories.find(
+      (c) => c.active && c.name.toLowerCase() === catName.toLowerCase()
+    );
     if (match?.code) code = match.code.toUpperCase();
   }
   return `PB|${code}|${p.sku}`;
@@ -54,14 +57,19 @@ export default function BarcodeGeneratorPage() {
       return;
     }
     // Load products and categories for selection and code mapping
-    Promise.all([listProducts(), listCategories()]).then(([list, cats]) => {
-      setProducts(list);
-      if (list.length > 0) setProductId(list[0].id || "");
-      setCategories(cats.filter(c => c.active));
-    }).catch((e) => console.error(e));
+    Promise.all([listProducts(), listCategories()])
+      .then(([list, cats]) => {
+        setProducts(list);
+        if (list.length > 0) setProductId(list[0].id || "");
+        setCategories(cats.filter((c) => c.active));
+      })
+      .catch((e) => console.error(e));
   }, [loading, user, role, router]);
 
-  const selected = useMemo(() => products.find((p) => p.id === productId), [products, productId]);
+  const selected = useMemo(
+    () => products.find((p) => p.id === productId),
+    [products, productId]
+  );
 
   useEffect(() => {
     // Draw preview for a single horizontal barcode
@@ -70,7 +78,12 @@ export default function BarcodeGeneratorPage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     try {
-      JsBarcode(canvas, code, { format: "CODE128B", displayValue: false, margin: 4, height: 36 });
+      JsBarcode(canvas, code, {
+        format: "CODE128B",
+        displayValue: false,
+        margin: 4,
+        height: 36,
+      });
     } catch (e) {
       console.error("Barcode render failed", e);
     }
@@ -79,10 +92,15 @@ export default function BarcodeGeneratorPage() {
     if (!selected) return;
     const count = Math.max(1, Math.min(300, Math.floor(qty)));
     // Open in a new tab so it can auto-close after printing
-    toast({ title: 'Sending to print…', description: `${count} label(s) for ${selected.name}`, variant: 'info', duration: 2000 });
+    toast({
+      title: "Sending to print…",
+      description: `${count} label(s) for ${selected.name}`,
+      variant: "info",
+      duration: 2000,
+    });
     try {
       const url = `/settings/barcodes/print/${selected.id}/${count}`;
-      window.open(url, '_blank', 'noopener');
+      window.open(url, "_blank", "noopener");
     } catch {
       // Fallback to same-tab navigation if popups are blocked
       router.push(`/settings/barcodes/print/${selected.id}/${count}`);
@@ -92,7 +110,13 @@ export default function BarcodeGeneratorPage() {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={() => window.location.href = "/settings"}>← Back</Button>
+        <Button
+          variant="link"
+          onClick={() => (window.location.href = "/settings")}
+          className="h-12 cursor-pointer"
+        >
+          <IoArrowBack className="mr-2"/>
+        </Button>
         <h1 className="text-xl font-semibold">Barcode Generator</h1>
         <div />
       </div>
@@ -106,39 +130,73 @@ export default function BarcodeGeneratorPage() {
               onChange={(e) => setProductId(e.target.value)}
             >
               {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} — {p.sku}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name} — {p.sku}
+                </option>
               ))}
             </select>
           </div>
           <div>
             <label className="text-sm font-medium">Quantity</label>
-            <Input type="number" min={1} max={300} value={qty} onChange={(e) => setQty(Number(e.target.value))} />
+            <Input
+              type="number"
+              min={1}
+              max={300}
+              value={qty}
+              onChange={(e) => setQty(Number(e.target.value))}
+            />
           </div>
           <div className="flex items-end gap-3">
-            <Button onClick={printLabels} disabled={!selected}>Print Labels</Button>
+            <Button onClick={printLabels} disabled={!selected}>
+              Print Labels
+            </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <div className="text-sm font-medium mb-2">Preview (50×25 mm, horizontal)</div>
+            <div className="text-sm font-medium mb-2">
+              Preview (50×25 mm, horizontal)
+            </div>
             <div className="border rounded-md p-4 flex flex-col items-center justify-center">
               {selected ? (
                 <>
-                  <div className="text-sm mb-2 font-medium truncate max-w-full">{selected.name}</div>
-                  <div style={{ width: '48mm', height: '12mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <canvas ref={canvasRef} className="bg-white rounded" style={{ width: '100%', height: '100%' }} />
+                  <div className="text-sm mb-2 font-medium truncate max-w-full">
+                    {selected.name}
                   </div>
-                  <div className="text-xs text-muted-foreground mt-2">{encodeBarcode(selected, categories)} • ₹{selected.unitPrice.toFixed(2)}</div>
+                  <div
+                    style={{
+                      width: "48mm",
+                      height: "12mm",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <canvas
+                      ref={canvasRef}
+                      className="bg-white rounded"
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-2">
+                    {encodeBarcode(selected, categories)} • ₹
+                    {selected.unitPrice.toFixed(2)}
+                  </div>
                 </>
               ) : (
-                <div className="text-xs text-muted-foreground">Select a product to preview</div>
+                <div className="text-xs text-muted-foreground">
+                  Select a product to preview
+                </div>
               )}
             </div>
           </div>
           <div>
             <div className="text-sm font-medium mb-2">Layout</div>
-            <div className="text-xs text-muted-foreground">Label size: 50×25 mm. One barcode per label (2×1 inch target) in horizontal orientation. Name on top; code and price below.</div>
+            <div className="text-xs text-muted-foreground">
+              Label size: 50×25 mm. One barcode per label (2×1 inch target) in
+              horizontal orientation. Name on top; code and price below.
+            </div>
           </div>
         </div>
       </Card>

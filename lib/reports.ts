@@ -159,13 +159,16 @@ export async function buildAccountingCsv(
    GSTR-1 CSV BUILDERS
 ====================================================== */
 
-export async function buildGstr1B2bCsv(fromIso: string, toIso: string) {
+export async function buildGstr1B2bCsv(
+  fromIso: string,
+  toIso: string
+): Promise<string> {
   const [invoices, customers] = await Promise.all([
     listInvoicesInRange(fromIso, toIso),
     listCustomers(),
   ]);
 
-  const customerMap = new Map(customers.map((c) => [c.id, c]));
+  const customerMap = new Map(customers.map(c => [c.id, c]));
 
   const header = [
     "GSTIN/UIN of Recipient",
@@ -182,30 +185,37 @@ export async function buildGstr1B2bCsv(fromIso: string, toIso: string) {
     "Cess Amount",
   ];
 
-  const rows = invoices.flatMap((inv) => {
+  const rows: (string | number)[][] = [];
+
+  for (const inv of invoices) {
     const cust = inv.customerId
       ? customerMap.get(inv.customerId)
       : undefined;
-    if (!cust?.email || !isValidGstin(cust.email)) return [];
 
-    return inv.items.map((item) => [
-      cust.email,
-      inv.invoiceNumber, // This is already a string
-      inv.issuedAt.slice(0, 10),
-      inv.grandTotal.toFixed(2),
-      DEFAULT_PLACE_OF_SUPPLY,
-      "N",
-      item.taxRatePct || "",
-      "Regular",
-      "",
-      item.taxRatePct || "",
-      (item.unitPrice * item.quantity).toFixed(2), // This is already a string
-      "",
-    ]);
-  });
+    const gstin = cust?.gstin?.trim().toUpperCase();
+    if (!gstin || !isValidGstin(gstin)) continue;
+
+    for (const item of inv.items) {
+      rows.push([
+        gstin,
+        inv.invoiceNumber,
+        inv.issuedAt.slice(0, 10),
+        inv.grandTotal.toFixed(2),
+        DEFAULT_PLACE_OF_SUPPLY,
+        "N",
+        item.taxRatePct || "",
+        "Regular",
+        "",
+        item.taxRatePct || "",
+        (item.unitPrice * item.quantity).toFixed(2),
+        ""
+      ]);
+    }
+  }
 
   return [header, ...rows].map(formatRow).join("\n");
 }
+
 
 export async function buildGstr1B2clCsv(fromIso: string, toIso: string) {
   const [invoices, customers] = await Promise.all([

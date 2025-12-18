@@ -17,40 +17,63 @@ export default function StockReportPage() {
 
   useEffect(() => {
     Promise.all([listProducts(), listCategories()])
-      .then(([prods, cats]) => { setProducts(prods); setCategories(cats.filter(c => c.active)); })
+      .then(([prods, cats]) => {
+        setProducts(prods);
+        setCategories(cats.filter((c) => c.active));
+      })
       .catch(() => undefined);
   }, []);
 
   const rows = useMemo(() => {
-    return products.filter(p => {
-      if (category && (p.category || '') !== category) return false;
+    return products.filter((p) => {
+      if (category && (p.category || "") !== category) return false;
       if (!onlyLow) return true;
-      const thr = typeof p.reorderLevel === 'number' ? p.reorderLevel : threshold;
+      const thr =
+        typeof p.reorderLevel === "number" ? p.reorderLevel : threshold;
       return p.stock <= thr;
     });
   }, [products, category, onlyLow, threshold]);
 
   function toCsv() {
-    const headers = ['Name', 'SKU', 'Category', 'HSN', 'Unit Price', 'Stock', 'Reorder Level'];
-    const lines = [headers.join(',')];
+    const headers = [
+      "Name",
+      "SKU",
+      "Category",
+      "HSN",
+      "Unit Price",
+      "Stock",
+      "Reorder Level",
+    ];
+    const lines = [headers.join(",")];
     for (const p of rows) {
-      const cols = [p.name, p.sku, p.category || '', p.hsnCode || '', String(p.unitPrice), String(p.stock), String(p.reorderLevel ?? '')];
-      lines.push(cols.map((c) => (c.includes(',') ? `"${c.replace(/"/g, '""')}"` : c)).join(','));
+      const cols = [
+        p.name,
+        p.sku,
+        p.category || "",
+        p.hsnCode || "",
+        String(p.unitPrice),
+        String(p.stock),
+        String(p.reorderLevel ?? ""),
+      ];
+      lines.push(
+        cols
+          .map((c) => (c.includes(",") ? `"${c.replace(/"/g, '""')}"` : c))
+          .join(",")
+      );
     }
-    return lines.join('\n');
+    return lines.join("\n");
   }
 
   function downloadCsv() {
     const csv = toCsv();
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `stock_${category || 'all'}_${onlyLow ? 'low' : 'all'}.csv`;
+    a.download = `stock_${category || "all"}_${onlyLow ? "low" : "all"}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
-
 
   if (loading) return <div className="p-6">Loading…</div>;
   if (!user) return null;
@@ -64,27 +87,54 @@ export default function StockReportPage() {
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <div>
               <label className="text-sm text-muted-foreground">Category</label>
-              <select className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
+              <select
+                className="w-full h-9 rounded-md border bg-background px-2 text-sm"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
                 <option value="">All</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                {categories.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="text-sm text-muted-foreground">Only Low Stock</label>
-              <select className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={String(onlyLow)} onChange={(e) => setOnlyLow(e.target.value === 'true')}>
+              <label className="text-sm text-muted-foreground">
+                Only Low Stock
+              </label>
+              <select
+                className="w-full h-9 rounded-md border bg-background px-2 text-sm"
+                value={String(onlyLow)}
+                onChange={(e) => setOnlyLow(e.target.value === "true")}
+              >
                 <option value="true">Yes</option>
                 <option value="false">No</option>
               </select>
             </div>
             <div>
-              <label className="text-sm text-muted-foreground">Default Threshold</label>
-              <input type="number" className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={threshold} onChange={(e) => setThreshold(Number(e.target.value || 0))} />
-              <div className="text-xs text-muted-foreground">Used when product has no reorder level</div>
+              <label className="text-sm text-muted-foreground">
+                Default Threshold
+              </label>
+              <input
+                type="number"
+                className="w-full h-9 rounded-md border bg-background px-2 text-sm"
+                value={threshold}
+                onChange={(e) => setThreshold(Number(e.target.value || 0))}
+              />
+              <div className="text-xs text-muted-foreground">
+                Used when product has no reorder level
+              </div>
             </div>
             <div className="flex items-end">
-              <button className="px-3 py-2 rounded-md border bg-background w-full" onClick={downloadCsv}>Export CSV</button>
+              <button
+                className="px-3 py-2 rounded-md border bg-background w-full"
+                onClick={downloadCsv}
+              >
+                Export CSV
+              </button>
             </div>
-
           </div>
           <div className="border rounded-md overflow-auto">
             <table className="w-full text-sm">
@@ -100,19 +150,30 @@ export default function StockReportPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(p => (
+                {rows.map((p) => (
                   <tr key={p.id} className="border-t">
                     <td className="px-3 py-2">{p.name}</td>
                     <td className="px-3 py-2">{p.sku}</td>
-                    <td className="px-3 py-2">{p.category || '-'}</td>
-                    <td className="px-3 py-2">{p.hsnCode || '-'}</td>
-                    <td className="px-3 py-2 text-right">₹{p.unitPrice.toFixed(2)}</td>
+                    <td className="px-3 py-2">{p.category || "-"}</td>
+                    <td className="px-3 py-2">{p.hsnCode || "-"}</td>
+                    <td className="px-3 py-2 text-right">
+                      ₹{p.unitPrice.toFixed(2)}
+                    </td>
                     <td className="px-3 py-2 text-right">{p.stock}</td>
-                    <td className="px-3 py-2 text-right">{p.reorderLevel ?? '-'}</td>
+                    <td className="px-3 py-2 text-right">
+                      {p.reorderLevel ?? "-"}
+                    </td>
                   </tr>
                 ))}
                 {rows.length === 0 && (
-                  <tr><td className="px-3 py-6 text-center text-muted-foreground" colSpan={7}>No products match filters</td></tr>
+                  <tr>
+                    <td
+                      className="px-3 py-6 text-center text-muted-foreground"
+                      colSpan={7}
+                    >
+                      No products match filters
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

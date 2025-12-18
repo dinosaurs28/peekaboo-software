@@ -40,25 +40,28 @@ export default function ReportsIndexPage() {
       <div className="flex flex-1 flex-col">
         <Topbar />
         <main className="flex-1 p-8 overflow-auto">
-          <div className="max-w-6xl mx-auto space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div className="border-b pb-2">
+              <h1 className="text-5xl font-serif font-bold text-gray-900">Reports</h1>
               <p className="text-sm text-gray-500 mt-1">
-                Analyze sales, payments, inventory and export accounting & GST data.
+                Analyze sales, payments, inventory and export accounting & GST
+                data.
               </p>
             </div>
 
             {/* Tabs */}
             <nav className="border-b border-gray-200">
               <ul className="flex flex-wrap gap-6 text-sm">
-                {([
-                  { key: "sales", label: "Sales" },
-                  { key: "payments", label: "Payments" },
-                  { key: "profitloss", label: "Profit & Loss" },
-                  { key: "accounting", label: "Accounting & GST Export" },
-                  { key: "stock", label: "Stock" },
-                  { key: "movement", label: "Movement" },
-                ] as Array<{ key: TabKey; label: string }>).map((it) => (
+                {(
+                  [
+                    { key: "sales", label: "Sales" },
+                    { key: "payments", label: "Payments" },
+                    { key: "profitloss", label: "Profit & Loss" },
+                    { key: "accounting", label: "Accounting & GST Export" },
+                    { key: "stock", label: "Stock" },
+                    { key: "movement", label: "Movement" },
+                  ] as Array<{ key: TabKey; label: string }>
+                ).map((it) => (
                   <li key={it.key}>
                     <button
                       type="button"
@@ -77,7 +80,7 @@ export default function ReportsIndexPage() {
             </nav>
 
             {/* Content */}
-            <div className="pt-2">
+            <div className="pt-2 shadow-sm">
               {tab === "sales" && <SalesInline />}
               {tab === "payments" && <PaymentsInline />}
               {tab === "profitloss" && <ProfitLossInline />}
@@ -193,7 +196,12 @@ function SalesInline() {
 
   return (
     <div className="space-y-4">
-      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+      <DateRangeFilter
+        from={from}
+        to={to}
+        onFromChange={setFrom}
+        onToChange={setTo}
+      />
       <select
         className="h-9 rounded-md border px-2 text-sm"
         value={period}
@@ -205,11 +213,7 @@ function SalesInline() {
       </select>
       <Table
         columns={["Period", "Invoices", "Total"]}
-        rows={rows.map((r) => [
-          r.period,
-          r.invoices,
-          `₹${r.total.toFixed(2)}`,
-        ])}
+        rows={rows.map((r) => [r.period, r.invoices, `₹${r.total.toFixed(2)}`])}
         emptyText="No data"
       />
     </div>
@@ -254,7 +258,12 @@ function PaymentsInline() {
 
   return (
     <div className="space-y-4">
-      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+      <DateRangeFilter
+        from={from}
+        to={to}
+        onFromChange={setFrom}
+        onToChange={setTo}
+      />
       <Table
         columns={["Payment Mode", "Amount"]}
         rows={rows.map((r) => [r.method, `₹${r.amount.toFixed(2)}`])}
@@ -271,8 +280,8 @@ function PaymentsInline() {
 function ProfitLossInline() {
   return (
     <div className="text-sm text-gray-500">
-      Profit & Loss will be calculated using costPrice × quantity.
-      (TODO: implement real COGS logic)
+      Profit & Loss will be calculated using costPrice × quantity. (TODO:
+      implement real COGS logic)
     </div>
   );
 }
@@ -314,29 +323,48 @@ function AccountingInline() {
     }
   };
 
-  const exportAll = async () => {
-    setBusy(true);
-    try {
-      const { buildUnifiedExportCsv } = await import("@/lib/reports");
-      const csv = await buildUnifiedExportCsv(
-        from.toISOString(),
-        to.toISOString()
-      );
-      downloadFile(
-        csv,
-        `ALL_REPORTS_${from.toISOString().slice(0, 10)}_${to
-          .toISOString()
-          .slice(0, 10)}.csv`,
-        "text/csv"
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
+  // const exportAll = async () => {
+  //   setBusy(true);
+  //   try {
+  //     const { buildUnifiedExportCsv } = await import("@/lib/reports");
+  //     const csv = await buildUnifiedExportCsv(
+  //       from.toISOString(),
+  //       to.toISOString()
+  //     );
+  //     downloadFile(
+  //       csv,
+  //       `ALL_REPORTS_${from.toISOString().slice(0, 10)}_${to
+  //         .toISOString()
+  //         .slice(0, 10)}.csv`,
+  //       "text/csv"
+  //     );
+  //   } finally {
+  //     setBusy(false);
+  //   }
+  // };
+
+  async function exportAll() {
+    const { buildGstr1Excel } = await import("@/lib/gst-xlsx");
+    const blob = await buildGstr1Excel(from.toISOString(), to.toISOString());
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `GSTR1_${from.toISOString().slice(0, 10)}_${to
+      .toISOString()
+      .slice(0, 10)}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="space-y-4">
-      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+      <DateRangeFilter
+        from={from}
+        to={to}
+        onFromChange={setFrom}
+        onToChange={setTo}
+      />
 
       <div className="flex gap-2">
         <button
@@ -413,13 +441,7 @@ function MovementInline() {
   return (
     <Table
       columns={["Product", "SKU", "Qty In", "Qty Out", "Net"]}
-      rows={rows.map((r) => [
-        r.name,
-        r.sku,
-        r.qtyIn,
-        r.qtyOut,
-        r.net,
-      ])}
+      rows={rows.map((r) => [r.name, r.sku, r.qtyIn, r.qtyOut, r.net])}
       emptyText="No movement"
     />
   );

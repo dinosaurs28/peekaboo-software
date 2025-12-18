@@ -14,7 +14,7 @@ export function StatCard({ label, value, icon, subtext, className }: StatCardPro
   return (
     <Card className={cn("p-6 flex flex-col gap-1 shadow-sm", className)}>
       <p className="text-sm text-gray-500 font-normal">{label}</p>
-      <h3 className="text-3xl font-bold text-gray-900 mt-1">{value}</h3>
+      <h3 className="text-5xl font-sans font-bold text-gray-900 mt-1">{value}</h3>
       {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}
     </Card>
   );

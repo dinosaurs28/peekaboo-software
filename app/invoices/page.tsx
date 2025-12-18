@@ -76,8 +76,8 @@ export default function InvoicesPage() {
       <div className="flex flex-1 flex-col overflow-hidden md:ml-1">
         <Topbar />
         <main className="flex-1 overflow-auto p-6 md:p-8 space-y-6">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-bold text-slate-900">Invoices</h1>
+          <div className="flex flex-col gap-1 md:gap-2">
+            <h1 className="text-5xl font-serif font-bold text-slate-900">Invoices</h1>
             <p className="text-sm text-slate-600">
               Manage and track all your invoices
             </p>
