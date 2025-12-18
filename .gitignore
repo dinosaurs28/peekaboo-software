@@ -40,6 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# scripts
-/scripts/**/*.js
-/scripts/**/*.json
+# Firebase / GCP secrets
+scripts/serviceAccountKey.json
+*.serviceAccountKey.json

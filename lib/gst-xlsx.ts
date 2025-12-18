@@ -6,8 +6,10 @@ import {
 } from "@/lib/reports";
 
 function csvToSheet(csv: string): XLSX.WorkSheet {
-  const wb = XLSX.read(csv, { type: "string" });
-  return wb.Sheets[wb.SheetNames[0]];
+  const rows = csv.split("\n").map(row => row.split(","));
+  return XLSX.utils.aoa_to_sheet(rows);
+  // const wb = XLSX.read(csv, { type: "string" });
+  // return wb.Sheets[wb.SheetNames[0]];
 }
 
 export async function buildGstr1Excel(

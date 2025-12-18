@@ -199,8 +199,9 @@ export async function buildGstr1B2bCsv(
   for (const inv of invoices) {
     const cust = inv.customerId ? customerMap.get(inv.customerId) : undefined;
 
-    const gstin = cust?.gstin?.trim().toUpperCase();
-    if (!gstin || !isValidGstin(gstin)) continue;
+    // Get the GSTIN or default to "None" if missing or invalid
+    const rawGstin = cust?.gstin?.trim().toUpperCase();
+    const gstin = (rawGstin && isValidGstin(rawGstin)) ? rawGstin : "None";
 
     for (const item of inv.items) {
       const rate = Number(item.taxRatePct || 0);
@@ -208,11 +209,11 @@ export async function buildGstr1B2bCsv(
       const { base } = splitInclusive(lineValue, rate);
 
       rows.push([
-        gstin,
+        gstin, // Now will show "None" if no GSTIN is found
         inv.invoiceNumber,
         formatGstDate(inv.issuedAt),
         inv.grandTotal.toFixed(2),
-        DEFAULT_PLACE_OF_SUPPLY,
+        inv.placeOfSupply || DEFAULT_PLACE_OF_SUPPLY, // Fallback to default
         "N",
         "",
         "Regular",
@@ -242,8 +243,8 @@ export async function buildGstr1B2clCsv(
   const rateMap = new Map<number, number>();
 
   for (const inv of invoices) {
-    // B2CL condition: invoice value > 2.5L
-    if (inv.grandTotal <= 250000) continue;
+    // B2CL condition:
+    if (inv.grandTotal <= 25000) continue;
 
     const cust = inv.customerId ? customerMap.get(inv.customerId) : undefined;
 
