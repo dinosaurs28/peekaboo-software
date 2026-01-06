@@ -1,5 +1,4 @@
 "use client";
-// Always render fresh and avoid static optimization for print labels
 export const dynamic = "force-dynamic";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -54,61 +53,53 @@ export default function PrintLabelsPage() {
   const codeText = useMemo(() => (prod ? encodeBarcode(prod, categories) : ""), [prod, categories]);
 
   useEffect(() => {
-    // Render barcodes into all label slots once data is ready
     if (!codeText) return;
-    const opts = { format: "CODE128B", displayValue: false, margin: 0, height: 80 } as const;
+    const opts = {
+      format: "CODE128B",
+      displayValue: false,
+      margin: 0,
+      height: 30,
+      width: 2
+    } as const;
+
     let drawn = 0;
     svgRefs.current.forEach((el) => { if (el) { JsBarcode(el, codeText, opts as any); drawn++; } });
-    // Mark ready when we drew at least one barcode and have expected elements
     if (drawn > 0) {
-      // wait a frame to ensure layout updated
       requestAnimationFrame(() => setBarcodesReady(true));
     }
   }, [codeText, labelsCount]);
 
   useEffect(() => {
-    // Prepare page CSS to scope printing ONLY to our labels root and page size
     const style = document.createElement('style');
     style.innerHTML = `
       @media print {
-        @page { size: 38.1mm 25.4mm; margin: 0; }
-        html, body { width: 38.1mm; height: 25.4mm; margin: 0; padding: 0; }
-        /* Hide everything except our print root */
+        @page { size: 50mm 25mm; margin: 0; }
+        html, body { width: 50mm; height: 25mm; margin: 0; padding: 0; }
         body * { visibility: hidden !important; }
         #labels-print-root, #labels-print-root * { visibility: visible !important; }
-        /* Ensure our root occupies the page area */
         #labels-print-root { position: absolute; inset: 0; margin: 0; padding: 0; }
       }
       #labels-print-root { background: #fff; }
     `;
     document.head.appendChild(style);
 
-    // Temporarily set a minimal title to avoid big headers if headers/footers are enabled
     const prevTitle = document.title;
     document.title = " ";
-    // Trigger print only when barcodes are ready
     const t = setTimeout(() => { if (barcodesReady) window.print(); }, 300);
 
     const handleAfterPrint = async () => {
-      if (handledRef.current) return; // guard against duplicate events
+      if (handledRef.current) return;
       handledRef.current = true;
       try {
         let didPrint = false;
-        try {
-          didPrint = window.confirm('Did the labels print successfully?');
-        } catch { }
+        try { didPrint = window.confirm('Did the labels print successfully?'); } catch { }
         if (didPrint && prod?.id) {
-          const totalBarcodes = labelsCount; // one barcode per label
-          await incrementPrintedCount(prod.id, totalBarcodes);
-          await adjustStock({ productId: prod.id, delta: totalBarcodes, reason: 'receive', userId: user?.uid, note: 'barcode-print' });
-          toast({ title: 'Stock updated', description: `${totalBarcodes} added for printing`, variant: 'success' });
-        } else {
-          toast({ title: 'No changes applied', description: 'Printing was cancelled', variant: 'info' });
+          await incrementPrintedCount(prod.id, labelsCount);
+          await adjustStock({ productId: prod.id, delta: labelsCount, reason: 'receive', userId: user?.uid, note: 'barcode-print' });
+          toast({ title: 'Stock updated', description: `${labelsCount} added for printing`, variant: 'success' });
         }
       } finally {
-        // Attempt to auto-close this tab (works if opened via window.open)
-        try { window.close(); } catch { /* ignore */ }
-        // Fallback navigation if window couldn't close itself
+        try { window.close(); } catch { }
         router.replace('/settings');
       }
     };
@@ -118,8 +109,8 @@ export default function PrintLabelsPage() {
 
   if (!prod) return <div className="p-6 text-sm">Preparing labels…</div>;
 
-  // Render N labels; each label has 5mm outer padding and 5mm gap between barcode columns
   const labels = Array.from({ length: labelsCount });
+  const showMrp = prod.mrp && prod.mrp > prod.unitPrice;
 
   return (
     <div id="labels-print-root">
@@ -128,30 +119,73 @@ export default function PrintLabelsPage() {
           key={idx}
           className="mx-auto"
           style={{
-            width: '38.1mm',
-            height: '25.4mm',
+            width: '50mm',
+            height: '25mm',
             padding: '1mm',
             boxSizing: 'border-box',
             pageBreakAfter: 'always',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'space-between'
+            justifyContent: 'space-between',
+            overflow: 'hidden'
           }}
         >
-          {/* Top: Product name */}
-          <div style={{ fontSize: '8pt', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+          {/* 1. Name */}
+          <div style={{
+            fontSize: '8pt',
+            fontWeight: 700,
+            lineHeight: 1.1,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            width: '100%',
+            textAlign: 'center'
+          }}>
             {prod.name}
           </div>
-          {/* Middle: Horizontal barcode (target 1.5"×1") */}
-          <div style={{ width: '36.1mm', height: '12.7mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg ref={(el) => { svgRefs.current[idx] = el; }} style={{ width: '100%', height: '100%' }} />
+
+          {/* 2. SP - Price */}
+          <div style={{
+            fontSize: '11pt',
+            fontWeight: 400,
+            lineHeight: 1,
+            marginTop: '0.5mm'
+          }}>
+            SP - ₹{prod.unitPrice.toFixed(0)}
           </div>
-          {/* Bottom: Code and price stacked */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0mm' }}>
-            <div style={{ fontSize: '7pt', lineHeight: 1 }}>{codeText}</div>
-            {/* Increased price font size for better readability on small labels */}
-            <div style={{ fontSize: '8.5pt', fontWeight: 600, lineHeight: 1, letterSpacing: '0.2pt' }}>₹{prod.unitPrice.toFixed(2)}</div>
+
+          {/* 3. Barcode */}
+          <div style={{
+            flex: 1,
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden'
+          }}>
+            <svg ref={(el) => { svgRefs.current[idx] = el; }} style={{ width: '90%', height: '100%' }} />
+          </div>
+
+          {/* 4. MRP & SKU */}
+          <div style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'space-between',
+            lineHeight: 1
+          }}>
+            <div style={{ fontSize: '6pt' }}>
+              {showMrp ? (
+                <span style={{ textDecoration: 'line-through' }}>
+                  MRP ₹{prod!.mrp!.toFixed(0)}
+                </span>
+              ) : <span>&nbsp;</span>}
+            </div>
+
+            <div style={{ fontSize: '6pt', fontFamily: 'monospace' }}>
+              {codeText}
+            </div>
           </div>
         </div>
       ))}

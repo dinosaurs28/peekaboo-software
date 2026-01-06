@@ -37,6 +37,7 @@ export interface ProductDoc extends BaseDoc {
   hsnCode?: string; // HSN/SAC code for GST
   unitPrice: number; // stored as number in smallest currency unit? (decide) currently decimal number
   costPrice?: number;
+  mrp?: number; // maximum retail price
   stock: number; // current on-hand quantity
   reorderLevel?: number; // threshold for low-stock alerts
   taxRatePct?: number; // e.g. 5 for 5%

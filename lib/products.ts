@@ -47,7 +47,8 @@ function toProductDoc(id: string, data: Record<string, unknown>): ProductDoc {
     sku: asString(data.sku, ""),
     category: typeof data.category === "string" ? data.category : undefined,
     hsnCode: typeof data.hsnCode === "string" ? data.hsnCode : undefined,
-    unitPrice: asNumber(data.unitPrice, 0),
+    unitPrice: asNumber(data.unitPrice, 0),       // This is the Selling Price
+    mrp: data.mrp != null ? asNumber(data.mrp) : undefined, // This is the new MRP field
     costPrice: data.costPrice != null ? asNumber(data.costPrice) : undefined,
     stock: asNumber(data.stock, 0),
     reorderLevel: data.reorderLevel != null ? asNumber(data.reorderLevel) : undefined,
@@ -85,7 +86,6 @@ export function observeLowStockProducts(cb: (items: ProductDoc[]) => void) {
   if (!db) { try { cb([]); } catch { /* noop */ } return () => {}; }
   const colRef = collection(db, COLLECTIONS.products);
   const q = query(colRef, orderBy("name"));
-  // Use onSnapshot to reflect changes in real time
   const unsub = onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
     const list: ProductDoc[] = snap.docs.map((d) => toProductDoc(d.id, d.data()));
     cb(list.filter((p: ProductDoc) => p.active && (p.reorderLevel ?? 0) > 0 && p.stock <= (p.reorderLevel ?? 0)));
@@ -99,6 +99,7 @@ export type UpsertProductInput = {
   unitPrice: number;
   stock: number;
   active: boolean;
+  mrp?: number; // Added to input type
   category?: string;
   hsnCode?: string;
   costPrice?: number;
@@ -114,7 +115,6 @@ export async function createProduct(input: UpsertProductInput): Promise<string> 
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-  // Remove undefined fields to please Firestore
   Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
   const res = await addDoc(col, payload);
   return res.id;
@@ -143,7 +143,6 @@ export async function incrementPrintedCount(id: string, qty: number): Promise<vo
   await updateDoc(ref, { printedCount: increment(qty), updatedAt: serverTimestamp() });
 }
 
-// POS helpers
 export async function findProductBySKU(sku: string): Promise<ProductDoc | null> {
   if (!db) return null;
   const colRef = collection(db, COLLECTIONS.products);

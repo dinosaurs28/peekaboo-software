@@ -18,6 +18,7 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
     name: initial?.name ?? "",
     sku: initial?.sku ?? "",
     unitPrice: initial?.unitPrice ?? 0,
+    mrp: initial?.mrp, // Initialize MRP
     stock: initial?.stock ?? 0,
     active: initial?.active ?? true,
     category: initial?.category,
@@ -134,10 +135,39 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
             ))}
           </select>
         </div>
+
+        {/* Pricing Section */}
         <div className="space-y-1">
-          <label className="text-sm font-medium">Unit Price</label>
-          <Input type="number" step="0.01" value={String(form.unitPrice)} onChange={(e) => update("unitPrice", parseFloat(e.target.value) || 0)} placeholder="399.00" />
+          <label className="text-sm font-medium">Selling Price</label>
+          <Input
+            type="number"
+            step="0.01"
+            value={String(form.unitPrice)}
+            onChange={(e) => update("unitPrice", parseFloat(e.target.value) || 0)}
+            placeholder="399.00"
+          />
         </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">MRP (Print Label)</label>
+          <Input
+            type="number"
+            step="0.01"
+            value={form.mrp ?? ""}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              // Store as undefined if empty/NaN so it doesn't overwrite with 0
+              update("mrp", Number.isNaN(val) ? undefined : val);
+            }}
+            placeholder="Leave empty if same as SP"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Cost Price</label>
+          <Input type="number" step="0.01" value={String(form.costPrice ?? 0)} onChange={(e) => update("costPrice", parseFloat(e.target.value) || 0)} placeholder="250.00" />
+        </div>
+
         <div className="space-y-1">
           <label className="text-sm font-medium">GST %</label>
           <Input
@@ -155,10 +185,7 @@ export function ProductForm({ mode, initial, onSaved }: ProductFormProps) {
             placeholder="12"
           />
         </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Cost Price</label>
-          <Input type="number" step="0.01" value={String(form.costPrice ?? 0)} onChange={(e) => update("costPrice", parseFloat(e.target.value) || 0)} placeholder="250.00" />
-        </div>
+
         <div className="space-y-1">
           <label className="text-sm font-medium">Stock</label>
           <Input type="number" value={String(form.stock)} onChange={(e) => update("stock", parseInt(e.target.value || "0", 10))} placeholder="100" />

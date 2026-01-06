@@ -14,14 +14,7 @@ import type { CategoryDoc } from "@/lib/models";
 import { useToast } from "@/components/ui/toast";
 import { IoArrowBack } from "react-icons/io5";
 
-// Contract:
-// - Admin only access; others redirected to /login or /dashboard
-// - Load products; allow selecting one product and quantity (labels)
-// - Render preview of a horizontal barcode
-// - Print: open dedicated print page sized 50×25 mm with one barcode per label
-
 function encodeBarcode(p: ProductDoc, categories: CategoryDoc[]): string {
-  // Prefer managed Category.code when Product.category matches a category name
   const catName = p.category;
   let code = categoryCode(catName);
   if (catName) {
@@ -33,8 +26,6 @@ function encodeBarcode(p: ProductDoc, categories: CategoryDoc[]): string {
   return `PB|${code}|${p.sku}`;
 }
 
-// No A4 export; printing uses a dedicated route
-
 export default function BarcodeGeneratorPage() {
   const { user, role, loading } = useAuth();
   const router = useRouter();
@@ -44,7 +35,6 @@ export default function BarcodeGeneratorPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [categories, setCategories] = useState<CategoryDoc[]>([]);
   const { toast } = useToast();
-  // Removed: Add to stock on export (deprecated per testing feedback)
 
   useEffect(() => {
     if (loading) return;
@@ -56,7 +46,6 @@ export default function BarcodeGeneratorPage() {
       router.replace("/dashboard");
       return;
     }
-    // Load products and categories for selection and code mapping
     Promise.all([listProducts(), listCategories()])
       .then(([list, cats]) => {
         setProducts(list);
@@ -72,7 +61,6 @@ export default function BarcodeGeneratorPage() {
   );
 
   useEffect(() => {
-    // Draw preview for a single horizontal barcode
     if (!selected) return;
     const code = encodeBarcode(selected, categories);
     const canvas = canvasRef.current;
@@ -81,17 +69,18 @@ export default function BarcodeGeneratorPage() {
       JsBarcode(canvas, code, {
         format: "CODE128B",
         displayValue: false,
-        margin: 4,
-        height: 36,
+        margin: 0,
+        height: 35,
+        width: 2
       });
     } catch (e) {
       console.error("Barcode render failed", e);
     }
-  }, [selected, qty]);
+  }, [selected, qty, categories]);
+
   function printLabels() {
     if (!selected) return;
     const count = Math.max(1, Math.min(300, Math.floor(qty)));
-    // Open in a new tab so it can auto-close after printing
     toast({
       title: "Sending to print…",
       description: `${count} label(s) for ${selected.name}`,
@@ -102,7 +91,6 @@ export default function BarcodeGeneratorPage() {
       const url = `/settings/barcodes/print/${selected.id}/${count}`;
       window.open(url, "_blank", "noopener");
     } catch {
-      // Fallback to same-tab navigation if popups are blocked
       router.push(`/settings/barcodes/print/${selected.id}/${count}`);
     }
   }
@@ -115,7 +103,7 @@ export default function BarcodeGeneratorPage() {
           onClick={() => (window.location.href = "/settings")}
           className="h-12 cursor-pointer"
         >
-          <IoArrowBack className="mr-2"/>
+          <IoArrowBack className="mr-2" />
         </Button>
         <h1 className="text-xl font-semibold">Barcode Generator</h1>
         <div />
@@ -158,32 +146,45 @@ export default function BarcodeGeneratorPage() {
             <div className="text-sm font-medium mb-2">
               Preview (50×25 mm, horizontal)
             </div>
-            <div className="border rounded-md p-4 flex flex-col items-center justify-center">
+            {/* PREVIEW CONTAINER */}
+            <div className="border rounded-md p-4 flex flex-col items-center justify-center bg-gray-50">
               {selected ? (
-                <>
-                  <div className="text-sm mb-2 font-medium truncate max-w-full">
+                <div
+                  className="bg-white border shadow-sm flex flex-col items-center text-center overflow-hidden relative"
+                  style={{ width: "50mm", height: "25mm", padding: "1mm" }}
+                >
+                  {/* 1. Name */}
+                  <div className="text-[10px] font-bold leading-tight w-full truncate mb-[1px]">
                     {selected.name}
                   </div>
-                  <div
-                    style={{
-                      width: "48mm",
-                      height: "12mm",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
+
+                  {/* 2. Selling Price (Below Name) */}
+                  <div className="text-sm font-extrabold leading-none mb-[2px]">
+                    SP - ₹{selected.unitPrice.toFixed(0)}
+                  </div>
+
+                  {/* 3. Barcode (Middle) */}
+                  <div className="flex-1 w-full flex items-center justify-center overflow-hidden">
                     <canvas
                       ref={canvasRef}
-                      className="bg-white rounded"
-                      style={{ width: "100%", height: "100%" }}
+                      style={{ height: "100%", maxWidth: "100%" }}
                     />
                   </div>
-                  <div className="text-xs text-muted-foreground mt-2">
-                    {encodeBarcode(selected, categories)} • ₹
-                    {selected.unitPrice.toFixed(2)}
+
+                  {/* 4. Bottom: MRP (Left) & SKU (Right) */}
+                  <div className="w-full flex justify-between items-end mt-[1px]">
+                    {selected.mrp && selected.mrp > selected.unitPrice ? (
+                      <span className="text-[8px] text-gray-500 line-through leading-none">
+                        MRP ₹{selected.mrp.toFixed(0)}
+                      </span>
+                    ) : (
+                      <span></span>
+                    )}
+                    <span className="font-mono text-[7px] leading-none">
+                      {encodeBarcode(selected, categories)}
+                    </span>
                   </div>
-                </>
+                </div>
               ) : (
                 <div className="text-xs text-muted-foreground">
                   Select a product to preview
@@ -193,9 +194,12 @@ export default function BarcodeGeneratorPage() {
           </div>
           <div>
             <div className="text-sm font-medium mb-2">Layout</div>
-            <div className="text-xs text-muted-foreground">
-              Label size: 50×25 mm. One barcode per label (2×1 inch target) in
-              horizontal orientation. Name on top; code and price below.
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>Label size: 50×25 mm.</p>
+              <p><strong>Top:</strong> Name</p>
+              <p><strong>Below Name:</strong> SP - ₹Price</p>
+              <p><strong>Middle:</strong> Barcode</p>
+              <p><strong>Bottom:</strong> MRP (Strikethrough) & SKU</p>
             </div>
           </div>
         </div>
