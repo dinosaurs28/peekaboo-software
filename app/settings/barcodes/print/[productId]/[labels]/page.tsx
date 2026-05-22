@@ -57,9 +57,9 @@ export default function PrintLabelsPage() {
     const opts = {
       format: "CODE128B",
       displayValue: false,
-      margin: 0,
+      margin: 4,
       height: 30,
-      width: 2
+      width: 1.6
     } as const;
 
     let drawn = 0;
@@ -112,7 +112,8 @@ export default function PrintLabelsPage() {
   if (!prod) return <div className="p-6 text-sm">Preparing labels…</div>;
 
   const labels = Array.from({ length: labelsCount });
-  const showMrp = prod.mrp && prod.mrp > prod.unitPrice;
+  const showMrp = prod.mrp != null;
+  const mrpLineThrough = prod.mrp != null && prod.mrp > prod.unitPrice;
 
   return (
     <div id="labels-print-root">
@@ -177,12 +178,8 @@ export default function PrintLabelsPage() {
             justifyContent: 'space-between',
             lineHeight: 1
           }}>
-            <div style={{ fontSize: '6pt' }}>
-              {showMrp ? (
-                <span>
-                  MRP ₹{prod!.mrp!.toFixed(0)}
-                </span>
-              ) : <span>&nbsp;</span>}
+            <div style={{ fontSize: '6pt', color: '#333', textDecoration: mrpLineThrough ? 'line-through' : 'none' }}>
+              {showMrp ? `MRP ₹${prod!.mrp!.toFixed(0)}` : 'MRP'}
             </div>
 
             <div style={{ fontSize: '6pt', fontFamily: 'monospace', letterSpacing: '0.05em' }}>

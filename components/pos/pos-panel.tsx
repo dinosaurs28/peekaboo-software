@@ -366,9 +366,9 @@ export function PosPanel() {
     return null;
   }
 
-  async function handleScanSubmit(e: React.FormEvent) {
+  async function handleScanSubmit(e: React.FormEvent | React.KeyboardEvent<HTMLInputElement>) {
     e.preventDefault();
-    const code = scanValue.trim();
+    const code = (inputRef.current?.value ?? scanValue).trim();
     if (!code) return;
     setError(null);
     const scanErr = parseScanError(code);
@@ -382,6 +382,7 @@ export function PosPanel() {
     if (!decoded) {
       showToast('error', 'Invalid barcode scan.');
       setScanValue("");
+      inputRef.current?.focus();
       return;
     }
 
@@ -810,7 +811,13 @@ export function PosPanel() {
                   setSearchTerm(e.target.value);
                   setSearchOpen(e.target.value.trim().length > 0);
                 }}
-                placeholder="Search for products"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleScanSubmit(e);
+                  }
+                }}
+                placeholder="Scan or search products"
                 autoComplete="off"
                 className="border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-600 placeholder:text-gray-400"
               />

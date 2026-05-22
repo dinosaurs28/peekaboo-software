@@ -145,10 +145,17 @@ export async function incrementPrintedCount(id: string, qty: number): Promise<vo
 
 export async function findProductBySKU(sku: string): Promise<ProductDoc | null> {
   if (!db) return null;
+  const trimmed = sku.trim();
+  if (!trimmed) return null;
+
   const colRef = collection(db, COLLECTIONS.products);
-  const qy = query(colRef, where("sku", "==", sku), limit(1));
+  const qy = query(colRef, where("sku", "==", trimmed), limit(1));
   const snap = await getDocs(qy);
-  if (snap.empty) return null;
-  const d = snap.docs[0];
-  return toProductDoc(d.id, d.data() as Record<string, unknown>);
+  if (!snap.empty) {
+    const d = snap.docs[0];
+    return toProductDoc(d.id, d.data() as Record<string, unknown>);
+  }
+
+  const all = await listProducts();
+  return all.find((p) => p.sku.trim().toLowerCase() === trimmed.toLowerCase()) ?? null;
 }

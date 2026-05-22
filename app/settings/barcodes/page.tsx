@@ -69,9 +69,9 @@ export default function BarcodeGeneratorPage() {
       JsBarcode(canvas, code, {
         format: "CODE128B",
         displayValue: false,
-        margin: 0,
+        margin: 4,
         height: 35,
-        width: 2
+        width: 1.6
       });
     } catch (e) {
       console.error("Barcode render failed", e);
@@ -173,12 +173,12 @@ export default function BarcodeGeneratorPage() {
 
                   {/* 4. Bottom: MRP (Left) & SKU (Right) */}
                   <div className="w-full flex justify-between items-end mt-[1px]">
-                    {selected.mrp && selected.mrp > selected.unitPrice ? (
-                      <span className="text-[8px] text-gray-500 line-through leading-none">
+                    {selected.mrp != null ? (
+                      <span className={"text-[8px] leading-none " + (selected.mrp > selected.unitPrice ? "text-gray-500 line-through" : "text-gray-700") }>
                         MRP ₹{selected.mrp.toFixed(0)}
                       </span>
                     ) : (
-                      <span></span>
+                      <span className="text-[8px] text-transparent">MRP</span>
                     )}
                     <span className="font-mono text-[7px] leading-none">
                       {encodeBarcode(selected, categories)}

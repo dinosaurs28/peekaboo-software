@@ -124,8 +124,8 @@ export default function ExchangePage() {
     );
   }
 
-  async function addNewByScan() {
-    const raw = scanValue.trim();
+  async function addNewByScan(rawValue?: string) {
+    const raw = (rawValue ?? inputRef.current?.value ?? scanValue).trim();
     if (!raw) return;
     setScanValue("");
     const dec = decodeBarcode(raw);
@@ -436,17 +436,17 @@ export default function ExchangePage() {
             <input
               ref={inputRef}
               value={scanValue}
-              onChange={(e) => setScanValue(e.target.value)}
+                  onChange={(e) => setScanValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  addNewByScan();
+                  addNewByScan(inputRef.current?.value ?? scanValue);
                 }
               }}
               className="h-9 border rounded px-2 w-72"
               placeholder="Scan or enter SKU…"
             />
-            <button className="h-9 px-3 rounded border" onClick={addNewByScan}>
+            <button className="h-9 px-3 rounded border" onClick={() => addNewByScan()}>
               Add
             </button>
           </div>
