@@ -254,7 +254,7 @@ function PaymentsInline() {
 
   useEffect(() => {
     run();
-  }, []);
+  }, [from, to]);
 
   return (
     <div className="space-y-4">
@@ -436,7 +436,7 @@ function MovementInline() {
     aggregateInventoryMovement(from.toISOString(), to.toISOString()).then(
       setRows
     );
-  }, []);
+  }, [from, to]);
 
   return (
     <Table
