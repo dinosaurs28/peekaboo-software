@@ -10,6 +10,7 @@ import {
   aggregatePaymentModes,
   buildAccountingCsv,
   aggregateInventoryMovement,
+  computeProfitLoss,
   type Period,
 } from "@/lib/reports";
 
@@ -278,10 +279,90 @@ function PaymentsInline() {
 ====================================================== */
 
 function ProfitLossInline() {
+  const [from, setFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [to, setTo] = useState(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  });
+  const [data, setData] = useState<{
+    revenue: number;
+    cost: number;
+    profit: number;
+    invoices: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const loadProfitLoss = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await computeProfitLoss(from.toISOString(), to.toISOString());
+      setData(result);
+    } finally {
+      setLoading(false);
+    }
+  }, [from, to]);
+
+  useEffect(() => {
+    loadProfitLoss();
+  }, [loadProfitLoss]);
+
   return (
-    <div className="text-sm text-gray-500">
-      Profit & Loss will be calculated using costPrice × quantity. (TODO:
-      implement real COGS logic)
+    <div className="space-y-4">
+      <DateRangeFilter
+        from={from}
+        to={to}
+        onFromChange={setFrom}
+        onToChange={setTo}
+      />
+      <div className="grid gap-4 md:grid-cols-3">
+        {loading || !data ? (
+          <div className="col-span-3 rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+            {loading ? "Loading profit & loss…" : "No profit data available."}
+          </div>
+        ) : (
+          [
+            {
+              label: "Revenue",
+              value: data.revenue,
+              accent: "text-emerald-700 bg-emerald-50",
+            },
+            {
+              label: "Cost of Goods Sold",
+              value: data.cost,
+              accent: "text-slate-700 bg-slate-50",
+            },
+            {
+              label: "Profit",
+              value: data.profit,
+              accent:
+                data.profit >= 0
+                  ? "text-emerald-700 bg-emerald-50"
+                  : "text-rose-700 bg-rose-50",
+            },
+          ].map((card) => (
+            <div
+              key={card.label}
+              className={`rounded-xl border border-gray-200 p-6 ${card.accent}`}
+            >
+              <p className="text-sm font-medium text-slate-600">{card.label}</p>
+              <p className="mt-3 text-3xl font-semibold">
+                ₹{card.value.toFixed(2)}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+      {data && !loading && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6">
+          <p className="text-sm text-gray-600">Invoices in range: {data.invoices}</p>
+        </div>
+      )}
     </div>
   );
 }

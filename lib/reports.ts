@@ -145,6 +145,37 @@ export async function buildAccountingCsv(
   return [header, ...rows].map(formatRow).join("\n");
 }
 
+export async function computeProfitLoss(
+  fromIso: string,
+  toIso: string
+): Promise<{ revenue: number; cost: number; profit: number; invoices: number }> {
+  const [invoices, products] = await Promise.all([
+    listInvoicesInRange(fromIso, toIso),
+    listProducts(),
+  ]);
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
+  let revenue = 0;
+  let cost = 0;
+
+  for (const inv of invoices) {
+    revenue += inv.grandTotal;
+    for (const item of inv.items) {
+      const prod = productMap.get(item.productId);
+      if (prod && typeof prod.costPrice === "number" && Number.isFinite(prod.costPrice)) {
+        cost += prod.costPrice * item.quantity;
+      }
+    }
+  }
+
+  return {
+    revenue,
+    cost,
+    profit: revenue - cost,
+    invoices: invoices.length,
+  };
+}
+
 // helpers for tax calculations
 function formatGstDate(iso: string): string {
   const d = new Date(iso);
