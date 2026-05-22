@@ -11,6 +11,8 @@ import { checkoutCart } from "@/lib/pos";
 type PendingPayload = {
   lines: Array<{ productId: string; name: string; qty: number; unitPrice: number; lineDiscount?: number; taxRatePct?: number }>;
   billDiscount?: number;
+  redeemedPoints?: number;
+  redeemedValue?: number;
   paymentMethod?: 'cash' | 'card' | 'upi' | 'wallet';
   paymentReferenceId?: string;
   cashierUserId?: string;
@@ -98,7 +100,8 @@ export default function ReceiptPreviewPage() {
 
     const sub = gross - lineDisc;
     const bill = Number(payload.billDiscount || 0);
-    const grand = Math.max(0, sub - bill);
+    const redeemed = Number(payload.redeemedValue || 0);
+    const grand = Math.max(0, sub - bill - redeemed);
 
     return {
       gross: round2(gross),
@@ -257,6 +260,19 @@ export default function ReceiptPreviewPage() {
               <span>Bill Discount</span>
               <span>- {payload.billDiscount.toFixed(2)}</span>
             </div>
+          ) : null}
+
+          {payload.redeemedPoints && payload.redeemedPoints > 0 ? (
+            <>
+              <div className="flex justify-between text-gray-600 mt-1">
+                <span>Points Redeemed</span>
+                <span>{payload.redeemedPoints}</span>
+              </div>
+              <div className="flex justify-between text-gray-600 mt-1">
+                <span>Loyalty Discount</span>
+                <span>- {payload.redeemedValue?.toFixed(2)}</span>
+              </div>
+            </>
           ) : null}
 
           <div className="border-b-2 border-black my-1" />

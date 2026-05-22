@@ -7,6 +7,8 @@ import { COLLECTIONS, GoodsReceiptDoc, GoodsReceiptLine } from "@/lib/models";
 export type CheckoutInput = {
   lines: Array<{ productId: string; name: string; qty: number; unitPrice: number; lineDiscount?: number }>;
   billDiscount?: number;
+  redeemedPoints?: number;
+  redeemedValue?: number;
   // Single payment only
   paymentMethod?: 'cash' | 'card' | 'upi' | 'wallet';
   paymentReferenceId?: string;
@@ -40,6 +42,22 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       throw new Error("Invalid bill discount: must be >= 0");
     }
   }
+  if (input.redeemedPoints != null) {
+    if (!(Number.isFinite(input.redeemedPoints) && Number(input.redeemedPoints) >= 0)) {
+      throw new Error("Invalid redeemed points");
+    }
+    if (!Number.isInteger(input.redeemedPoints)) {
+      throw new Error("Redeemed points must be whole numbers");
+    }
+  }
+  if (input.redeemedValue != null) {
+    if (!(Number.isFinite(input.redeemedValue) && Number(input.redeemedValue) >= 0)) {
+      throw new Error("Invalid redeemed value: must be >= 0");
+    }
+  }
+  if ((input.redeemedPoints ?? 0) > 0 && !input.customerId) {
+    throw new Error("Loyalty redemption requires a customer account");
+  }
   // Compute inclusive totals: Subtotal = sum of (MRP * qty - lineDiscounts)
   const linesWithNet = input.lines.map(l => ({
     ...l,
@@ -47,8 +65,12 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
   }));
   const subtotal = linesWithNet.reduce((s, l) => s + l.net, 0);
   const billDisc = input.billDiscount ?? 0;
+  const redeemedValue = input.redeemedValue ?? 0;
   if (billDisc > subtotal) {
     throw new Error("Bill discount cannot exceed subtotal");
+  }
+  if (redeemedValue > subtotal - billDisc) {
+    throw new Error("Loyalty redemption cannot exceed payable subtotal");
   }
   // Tax is derived from MRP (unitPrice) only, not reduced by discounts (post-tax discounts)
   const taxTotal = input.lines.reduce((s, l) => {
@@ -57,7 +79,7 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
     const gstPerUnit = r > 0 ? (l.unitPrice - l.unitPrice / (1 + r)) : 0;
     return s + gstPerUnit * l.qty;
   }, 0);
-  const grandTotal = Math.max(0, subtotal - billDisc);
+  const grandTotal = Math.max(0, subtotal - billDisc - redeemedValue);
   const method = input.paymentMethod ?? 'cash';
   const refId = input.paymentReferenceId;
   const cashierUserId = input.cashierUserId ?? 'current-user';
@@ -142,6 +164,9 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       subtotal,
       taxTotal,
   discountTotal: billDisc,
+  redeemedPoints: input.redeemedPoints && input.redeemedPoints > 0 ? input.redeemedPoints : undefined,
+  redeemedValue: redeemedValue > 0 ? redeemedValue : undefined,
+  loyaltyPointsEarned: Math.floor(grandTotal / 100) > 0 ? Math.floor(grandTotal / 100) : undefined,
       grandTotal,
   paymentMethod: method,
   ...(refId ? { paymentReferenceId: refId } : {}),
@@ -166,13 +191,28 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       updatedAt: serverTimestamp(),
     });
 
-    // Loyalty: award points to customer if present
+    // Loyalty: adjust customer points and award new points if present
     if (input.customerId) {
-      const points = Math.floor(grandTotal / 100);
-      if (points > 0 || grandTotal > 0) {
-        const cRef = doc(dbx, COLLECTIONS.customers, input.customerId);
-        tx.set(cRef, { loyaltyPoints: increment(points), totalSpend: increment(grandTotal), updatedAt: serverTimestamp() }, { merge: true });
+      const cRef = doc(dbx, COLLECTIONS.customers, input.customerId);
+      const customerSnap = await tx.get(cRef);
+      if (!customerSnap.exists()) {
+        throw new Error("Customer not found for loyalty adjustment");
       }
+      const currentPoints = Number(customerSnap.data()?.loyaltyPoints ?? 0);
+      const redeemedPoints = Number(input.redeemedPoints ?? 0);
+      if (redeemedPoints > currentPoints) {
+        throw new Error("Insufficient loyalty points");
+      }
+      const points = Math.floor(grandTotal / 100);
+      const loyaltyDelta = (points > 0 ? points : 0) - (redeemedPoints > 0 ? redeemedPoints : 0);
+      const customerPayload: any = {
+        updatedAt: serverTimestamp(),
+        totalSpend: increment(grandTotal),
+      };
+      if (loyaltyDelta !== 0) {
+        customerPayload.loyaltyPoints = increment(loyaltyDelta);
+      }
+      tx.set(cRef, customerPayload, { merge: true });
     }
     return invRef.id;
   });

@@ -40,6 +40,8 @@ export function PosPanel() {
   const [custKidsDob, setCustKidsDob] = useState("");
   const [custFound, setCustFound] = useState<{ id: string; name: string; points?: number } | null>(null);
   const [custChecking, setCustChecking] = useState(false);
+  const [redeemedPoints, setRedeemedPoints] = useState(0);
+  const [redeemError, setRedeemError] = useState<string | null>(null);
   const phoneLookupSeq = useRef(0);
   const [busy, setBusy] = useState(false);
   // UI-only: GST fields (no backend changes)
@@ -208,8 +210,29 @@ export function PosPanel() {
   const subTotal = useMemo(() => cart.reduce((sum, l) => sum + (l.product.unitPrice * l.qty - lineDiscount(l)), 0), [cart, lineDiscount]);
   // Bill-level discount
   const billDiscComputed = useMemo(() => (billDiscountMode === 'amount' ? billDiscount : (subTotal * billDiscount) / 100), [billDiscountMode, billDiscount, subTotal]);
-  // Grand total (tax-inclusive pricing): sum of MRP minus discounts; do not add tax separately
+  // Grand total before loyalty redemption (tax-inclusive pricing): sum of MRP minus discounts; do not add tax separately
   const total = useMemo(() => Math.max(0, subTotal - billDiscComputed), [subTotal, billDiscComputed]);
+  const LOYALTY_POINT_VALUE = 1;
+  const loyaltyRedeemMax = useMemo(
+    () => Math.min(custFound?.points ?? 0, Math.max(0, Math.floor(total / LOYALTY_POINT_VALUE))),
+    [custFound?.points, total]
+  );
+  const loyaltyRedeemedValue = useMemo(
+    () => Math.min(Math.max(0, redeemedPoints), loyaltyRedeemMax) * LOYALTY_POINT_VALUE,
+    [redeemedPoints, loyaltyRedeemMax]
+  );
+  const amountDue = useMemo(() => Math.max(0, total - loyaltyRedeemedValue), [total, loyaltyRedeemedValue]);
+
+  useEffect(() => {
+    if (!custFound || custFound.points == null || custFound.points <= 0) {
+      setRedeemedPoints(0);
+      return;
+    }
+    const max = loyaltyRedeemMax;
+    if (redeemedPoints > max) {
+      setRedeemedPoints(max);
+    }
+  }, [custFound, loyaltyRedeemMax, redeemedPoints]);
 
   function isDobMonthMatch(): boolean {
     if (!custKidsDob) return false;
@@ -610,6 +633,21 @@ export function PosPanel() {
           customerId = newId;
         }
       }
+      if (redeemedPoints > 0) {
+        if (!custFound) {
+          showToast('error', 'Select an existing customer before redeeming points');
+          return;
+        }
+        const pointsAvailable = custFound.points ?? 0;
+        if (redeemedPoints > pointsAvailable) {
+          showToast('error', 'Redeemed points cannot exceed available loyalty points');
+          return;
+        }
+        if (redeemedPoints * LOYALTY_POINT_VALUE > total) {
+          showToast('error', 'Redeemed value cannot exceed the payable bill amount');
+          return;
+        }
+      }
       if (!navigator.onLine) {
         // enqueue the checkout for later sync
         try {
@@ -617,6 +655,8 @@ export function PosPanel() {
           const payload = {
             lines: cart.map((l) => ({ productId: l.product.id!, name: l.product.name, qty: l.qty, unitPrice: l.product.unitPrice, lineDiscount: lineDiscount(l), taxRatePct: l.product.taxRatePct })),
             billDiscount: billDiscComputed,
+            redeemedPoints: redeemedPoints > 0 ? redeemedPoints : undefined,
+            redeemedValue: redeemedPoints > 0 ? redeemedPoints * LOYALTY_POINT_VALUE : undefined,
             paymentMethod,
             paymentReferenceId: paymentRef || undefined,
             cashierUserId: user?.uid,
@@ -643,6 +683,8 @@ export function PosPanel() {
             taxRatePct: l.product.taxRatePct,
           }) as any),
           billDiscount: billDiscComputed,
+          redeemedPoints: redeemedPoints > 0 ? redeemedPoints : undefined,
+          redeemedValue: redeemedPoints > 0 ? redeemedPoints * LOYALTY_POINT_VALUE : undefined,
           paymentMethod,
           paymentReferenceId: paymentRef || undefined,
           cashierUserId: user?.uid,
@@ -661,6 +703,8 @@ export function PosPanel() {
       setSelectedIndex(-1);
       setBillDiscount(0);
       setPaymentRef("");
+      setRedeemedPoints(0);
+      setRedeemError(null);
       // split payments removed
       setCustPhone("");
       setCustName("");
@@ -939,10 +983,32 @@ export function PosPanel() {
                     </Button>
                   </div>
                   {custFound ? (
-                    <div className="text-xs text-gray-600 bg-emerald-50 border border-emerald-200 rounded px-3 py-2">
-                      <div className="font-medium text-gray-900">{custFound.name}</div>
-                      {typeof custFound.points === 'number' && (
-                        <div className="mt-1">Loyalty Points: <span className="font-semibold text-emerald-700">{custFound.points}</span></div>
+                    <div className="text-xs text-gray-600 bg-emerald-50 border border-emerald-200 rounded px-3 py-2 space-y-3">
+                      <div>
+                        <div className="font-medium text-gray-900">{custFound.name}</div>
+                        {typeof custFound.points === 'number' && (
+                          <div className="mt-1">Loyalty Points: <span className="font-semibold text-emerald-700">{custFound.points}</span></div>
+                        )}
+                      </div>
+                      {typeof custFound.points === 'number' && custFound.points > 0 && (
+                        <div className="bg-white rounded border border-emerald-100 p-3">
+                          <div className="text-xs text-gray-500">Redeem points for ₹1 per point. Maximum redemption is the bill amount.</div>
+                          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={loyaltyRedeemMax}
+                              value={redeemedPoints === 0 ? "" : redeemedPoints}
+                              onChange={(e) => setRedeemedPoints(Math.max(0, Math.min(loyaltyRedeemMax, Math.floor(Number(e.target.value) || 0))))}
+                              placeholder={`0 / ${loyaltyRedeemMax}`}
+                              className="w-full sm:w-32"
+                            />
+                            <div className="text-sm text-gray-700">
+                              Redeem value: ₹{loyaltyRedeemedValue.toFixed(2)}
+                            </div>
+                          </div>
+                          {redeemError ? <div className="text-xs text-red-600 mt-1">{redeemError}</div> : null}
+                        </div>
                       )}
                     </div>
                   ) : custPhone ? (
@@ -1002,15 +1068,19 @@ export function PosPanel() {
               <div className="space-y-1 text-sm text-gray-600">
                 <div>Subtotal</div>
                 <div>Bill Discount</div>
+                {loyaltyRedeemedValue > 0 && <div>Loyalty Redemption</div>}
               </div>
               <div className="text-right space-y-1">
                 <div className="text-sm font-medium text-gray-900">₹{subTotal.toFixed(2)}</div>
                 <div className="text-sm font-medium text-gray-900">−₹{billDiscComputed.toFixed(2)}</div>
+                {loyaltyRedeemedValue > 0 && (
+                  <div className="text-sm font-medium text-gray-900">−₹{loyaltyRedeemedValue.toFixed(2)}</div>
+                )}
               </div>
             </div>
             <div className="border-t mt-4 pt-4 flex items-center justify-between">
-              <div className="text-lg font-semibold text-gray-900">Grand Total</div>
-              <div className="text-2xl font-bold text-gray-900">₹{total.toFixed(2)}</div>
+              <div className="text-lg font-semibold text-gray-900">Amount Due</div>
+              <div className="text-2xl font-bold text-gray-900">₹{amountDue.toFixed(2)}</div>
             </div>
           </div>
         )}

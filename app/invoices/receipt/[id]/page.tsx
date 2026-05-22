@@ -227,6 +227,19 @@ export default function InvoiceReceiptPage() {
             </div>
           ) : null}
 
+          {inv.redeemedPoints && inv.redeemedPoints > 0 ? (
+            <>
+              <div className="flex justify-between text-gray-600 mt-1">
+                <span>Points Redeemed</span>
+                <span>{inv.redeemedPoints}</span>
+              </div>
+              <div className="flex justify-between text-gray-600 mt-1">
+                <span>Loyalty Discount</span>
+                <span>- {inv.redeemedValue?.toFixed(2)}</span>
+              </div>
+            </>
+          ) : null}
+
           {/* --- Grand Total Separator --- */}
           <div className="border-b-2 border-black my-1" />
 

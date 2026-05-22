@@ -61,6 +61,9 @@ export interface InvoiceDoc extends BaseDoc {
   subtotal: number;
   taxTotal: number;
   discountTotal?: number;
+  redeemedPoints?: number;
+  redeemedValue?: number;
+  loyaltyPointsEarned?: number;
   grandTotal: number;
   paymentMethod: 'cash' | 'card' | 'upi' | 'wallet';
   paymentReferenceId?: string;

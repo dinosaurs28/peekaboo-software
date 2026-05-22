@@ -73,11 +73,13 @@ export default function PrintLabelsPage() {
     const style = document.createElement('style');
     style.innerHTML = `
       @media print {
-        @page { size: 50mm 25mm; margin: 0; }
+        @page { size: 50mm 25mm landscape; margin: 0; }
         html, body { width: 50mm; height: 25mm; margin: 0; padding: 0; }
         body * { visibility: hidden !important; }
         #labels-print-root, #labels-print-root * { visibility: visible !important; }
         #labels-print-root { position: absolute; inset: 0; margin: 0; padding: 0; }
+        #labels-print-root svg { shape-rendering: crispEdges !important; text-rendering: geometricPrecision !important; }
+        #labels-print-root svg path, #labels-print-root svg rect { shape-rendering: crispEdges !important; }
       }
       #labels-print-root { background: #fff; }
     `;
@@ -171,19 +173,19 @@ export default function PrintLabelsPage() {
           <div style={{
             width: '100%',
             display: 'flex',
-            alignItems: 'flex-end',
+            alignItems: 'center',
             justifyContent: 'space-between',
             lineHeight: 1
           }}>
             <div style={{ fontSize: '6pt' }}>
               {showMrp ? (
-                <span style={{ textDecoration: 'line-through' }}>
+                <span>
                   MRP ₹{prod!.mrp!.toFixed(0)}
                 </span>
               ) : <span>&nbsp;</span>}
             </div>
 
-            <div style={{ fontSize: '6pt', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '6pt', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
               {codeText}
             </div>
           </div>
