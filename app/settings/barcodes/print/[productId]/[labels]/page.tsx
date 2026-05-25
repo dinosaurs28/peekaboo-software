@@ -126,7 +126,7 @@ export default function PrintLabelsPage() {
             height: '25mm',
             padding: '1mm',
             boxSizing: 'border-box',
-            pageBreakAfter: 'always',
+            pageBreakAfter: idx < labelsCount - 1 ? 'always' : 'auto',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -176,13 +176,33 @@ export default function PrintLabelsPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            lineHeight: 1
+            gap: '3mm',
+            lineHeight: 1,
+            overflow: 'hidden'
           }}>
-            <div style={{ fontSize: '6pt', color: '#333', textDecoration: mrpLineThrough ? 'line-through' : 'none' }}>
-              {showMrp ? `MRP ₹${prod!.mrp!.toFixed(0)}` : 'MRP'}
+            <div style={{
+              flex: '1 1 0',
+              minWidth: 0,
+              fontSize: '6pt',
+              color: '#333',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              textAlign: 'left'
+            }}>
+              {showMrp ? `MRP - ₹${prod!.mrp!.toFixed(0)}` : ''}
             </div>
-
-            <div style={{ fontSize: '6pt', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+            <div style={{
+              flex: '1 1 0',
+              minWidth: 0,
+              fontSize: '6pt',
+              fontFamily: 'monospace',
+              letterSpacing: '0.05em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              textAlign: 'right'
+            }}>
               {codeText}
             </div>
           </div>

@@ -156,37 +156,56 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       });
     }
 
-    // Create invoice document
-    const inv: Omit<InvoiceDoc, 'id'> = {
+    // Create invoice document payload without undefined Firestore fields
+    const invPayload: Record<string, unknown> = {
       invoiceNumber,
-      // customerId omitted unless provided
-  items: linesWithNet.map((l: any) => ({ productId: l.productId, name: l.name, quantity: l.qty, unitPrice: l.unitPrice, taxRatePct: (l as any).taxRatePct || undefined, discountAmount: l.lineDiscount ?? 0 })),
+      items: linesWithNet.map((l: any) => ({
+        productId: l.productId,
+        name: l.name,
+        quantity: l.qty,
+        unitPrice: l.unitPrice,
+        taxRatePct: (l as any).taxRatePct || undefined,
+        discountAmount: l.lineDiscount ?? 0,
+      })),
       subtotal,
       taxTotal,
-  discountTotal: billDisc,
-  redeemedPoints: input.redeemedPoints && input.redeemedPoints > 0 ? input.redeemedPoints : undefined,
-  redeemedValue: redeemedValue > 0 ? redeemedValue : undefined,
-  loyaltyPointsEarned: Math.floor(grandTotal / 100) > 0 ? Math.floor(grandTotal / 100) : undefined,
+      discountTotal: billDisc,
       grandTotal,
-  paymentMethod: method,
-  ...(refId ? { paymentReferenceId: refId } : {}),
+      paymentMethod: method,
       balanceDue: 0,
       cashierUserId,
-      ...(cashierName ? { cashierName } : {}),
       status: 'paid',
       issuedAt: nowIso,
       createdAt: nowIso,
       updatedAt: nowIso,
     };
 
-    // No-op: payments already validated above
+    if (refId) {
+      invPayload.paymentReferenceId = refId;
+    }
+    if (input.customerId) {
+      invPayload.customerId = input.customerId;
+    }
+    if (typeof cashierName === 'string' && cashierName.trim()) {
+      invPayload.cashierName = cashierName;
+    }
+    if (input.redeemedPoints != null && input.redeemedPoints > 0) {
+      invPayload.redeemedPoints = input.redeemedPoints;
+    }
+    if (redeemedValue > 0) {
+      invPayload.redeemedValue = redeemedValue;
+    }
+    const earnedPoints = Math.floor(grandTotal / 100);
+    if (earnedPoints > 0) {
+      invPayload.loyaltyPointsEarned = earnedPoints;
+    }
+    if (typeof (input as any).opId === 'string' && (input as any).opId.trim()) {
+      invPayload.opId = (input as any).opId;
+    }
 
     // Create invoice inside the transaction using tx.set
     tx.set(invRef, {
-      ...inv,
-      ...(input.customerId ? { customerId: input.customerId } : {}),
-      // Idempotency: allow external callers to set opId to avoid duplicates on replay
-      ...(typeof (input as any).opId === 'string' ? { opId: (input as any).opId } : {}),
+      ...invPayload,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });

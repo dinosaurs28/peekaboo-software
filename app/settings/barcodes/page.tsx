@@ -172,17 +172,19 @@ export default function BarcodeGeneratorPage() {
                   </div>
 
                   {/* 4. Bottom: MRP (Left) & SKU (Right) */}
-                  <div className="w-full flex justify-between items-end mt-[1px]">
-                    {selected.mrp != null ? (
-                      <span className={"text-[8px] leading-none " + (selected.mrp > selected.unitPrice ? "text-gray-500 line-through" : "text-gray-700") }>
-                        MRP ₹{selected.mrp.toFixed(0)}
-                      </span>
-                    ) : (
-                      <span className="text-[8px] text-transparent">MRP</span>
-                    )}
-                    <span className="font-mono text-[7px] leading-none">
+                  <div className="w-full flex items-end justify-between gap-2 mt-[1px]">
+                    <div className="min-w-0 text-left text-[8px] leading-none text-gray-700">
+                      {selected.mrp != null ? (
+                        <span className="leading-none text-gray-700">
+                          MRP - ₹{selected.mrp.toFixed(0)}
+                        </span>
+                      ) : (
+                        <span className="text-transparent">MRP - ₹0</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 text-right text-[7px] leading-none font-mono truncate">
                       {encodeBarcode(selected, categories)}
-                    </span>
+                    </div>
                   </div>
                 </div>
               ) : (
