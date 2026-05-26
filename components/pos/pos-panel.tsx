@@ -42,11 +42,16 @@ export function PosPanel() {
   const [custChecking, setCustChecking] = useState(false);
   const [redeemedPoints, setRedeemedPoints] = useState(0);
   const [redeemError, setRedeemError] = useState<string | null>(null);
+  const [redeemOpen, setRedeemOpen] = useState(false);
   const phoneLookupSeq = useRef(0);
   const [busy, setBusy] = useState(false);
   // UI-only: GST fields (no backend changes)
   const [gstin, setGstin] = useState("");
   const [placeOfSupply, setPlaceOfSupply] = useState("");
+
+  useEffect(() => {
+    if (!custFound) setRedeemOpen(false);
+  }, [custFound]);
 
   // Focus the input to capture scanner entries
   useEffect(() => {
@@ -990,15 +995,29 @@ export function PosPanel() {
                     </Button>
                   </div>
                   {custFound ? (
-                    <div className="text-xs text-gray-600 bg-emerald-50 border border-emerald-200 rounded px-3 py-2 space-y-3">
-                      <div>
-                        <div className="font-medium text-gray-900">{custFound.name}</div>
-                        {typeof custFound.points === 'number' && (
-                          <div className="mt-1">Loyalty Points: <span className="font-semibold text-emerald-700">{custFound.points}</span></div>
-                        )}
+                    <div className="text-xs text-gray-600 bg-emerald-50 border border-emerald-200 rounded px-3 py-2 space-y-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-medium text-gray-900">{custFound.name}</div>
+                          {typeof custFound.points === 'number' && (
+                            <div className="mt-1 flex items-center gap-3">
+                              <div className="text-sm">Loyalty Points: <span className="font-semibold text-emerald-700">{custFound.points}</span></div>
+                              {typeof custFound.points === 'number' && custFound.points > 0 && (
+                                <button
+                                  type="button"
+                                  className="text-xs px-2 py-0.5 rounded border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                  onClick={() => setRedeemOpen((v) => !v)}
+                                >
+                                  {redeemOpen ? 'Close' : 'Redeem'}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
                       </div>
-                      {typeof custFound.points === 'number' && custFound.points > 0 && (
-                        <div className="bg-white rounded border border-emerald-100 p-3">
+                      {typeof custFound.points === 'number' && custFound.points > 0 && redeemOpen && (
+                        <div className="bg-white rounded border border-emerald-100 p-3 mt-1">
                           <div className="text-xs text-gray-500">Redeem points for ₹1 per point. Maximum redemption is the bill amount.</div>
                           <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
                             <Input
