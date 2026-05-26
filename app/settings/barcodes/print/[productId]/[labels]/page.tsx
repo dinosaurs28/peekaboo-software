@@ -88,6 +88,7 @@ export default function PrintLabelsPage() {
         }
         #labels-print-root > div:last-child {
           page-break-after: auto;
+          break-after: auto;
         }
       }
       #labels-print-root { background: #fff; }
@@ -202,7 +203,7 @@ export default function PrintLabelsPage() {
               textAlign: 'left'
             }}>
               {showMrp ? (
-                <span style={{ textDecoration: mrpLineThrough ? 'line-through' : 'none' }}>
+                <span>
                   MRP - ₹{prod!.mrp!.toFixed(0)}
                 </span>
               ) : ''}
