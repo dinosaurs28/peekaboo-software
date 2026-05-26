@@ -80,6 +80,15 @@ export default function PrintLabelsPage() {
         #labels-print-root { position: absolute; inset: 0; margin: 0; padding: 0; }
         #labels-print-root svg { shape-rendering: crispEdges !important; text-rendering: geometricPrecision !important; }
         #labels-print-root svg path, #labels-print-root svg rect { shape-rendering: crispEdges !important; }
+        #labels-print-root > div {
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+        #labels-print-root > div:last-child {
+          page-break-after: auto;
+        }
       }
       #labels-print-root { background: #fff; }
     `;
@@ -123,7 +132,7 @@ export default function PrintLabelsPage() {
           className="mx-auto"
           style={{
             width: '50mm',
-            height: '25mm',
+            minHeight: '25mm',
             padding: '1mm',
             boxSizing: 'border-box',
             pageBreakAfter: idx < labelsCount - 1 ? 'always' : 'auto',
@@ -131,7 +140,9 @@ export default function PrintLabelsPage() {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'space-between',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            breakInside: 'avoid',
+            pageBreakInside: 'avoid',
           }}
         >
           {/* 1. Name */}
@@ -184,13 +195,17 @@ export default function PrintLabelsPage() {
               flex: '1 1 0',
               minWidth: 0,
               fontSize: '6pt',
-              color: '#333',
+              color: '#111',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               textAlign: 'left'
             }}>
-              {showMrp ? `MRP - ₹${prod!.mrp!.toFixed(0)}` : ''}
+              {showMrp ? (
+                <span style={{ textDecoration: mrpLineThrough ? 'line-through' : 'none' }}>
+                  MRP - ₹{prod!.mrp!.toFixed(0)}
+                </span>
+              ) : ''}
             </div>
             <div style={{
               flex: '1 1 0',

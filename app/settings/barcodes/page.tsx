@@ -59,6 +59,7 @@ export default function BarcodeGeneratorPage() {
     () => products.find((p) => p.id === productId),
     [products, productId]
   );
+  const mrpLineThrough = selected?.mrp != null && selected.mrp > selected.unitPrice;
 
   useEffect(() => {
     if (!selected) return;
@@ -89,7 +90,7 @@ export default function BarcodeGeneratorPage() {
     });
     try {
       const url = `/settings/barcodes/print/${selected.id}/${count}`;
-      window.open(url, "_blank", "noopener");
+      window.open(url, "_blank", "noopener,noreferrer");
     } catch {
       router.push(`/settings/barcodes/print/${selected.id}/${count}`);
     }
@@ -175,7 +176,10 @@ export default function BarcodeGeneratorPage() {
                   <div className="w-full flex items-end justify-between gap-2 mt-[1px]">
                     <div className="min-w-0 text-left text-[8px] leading-none text-gray-700">
                       {selected.mrp != null ? (
-                        <span className="leading-none text-gray-700">
+                        <span
+                          className="leading-none text-gray-700"
+                          style={{ textDecoration: mrpLineThrough ? 'line-through' : 'none' }}
+                        >
                           MRP - ₹{selected.mrp.toFixed(0)}
                         </span>
                       ) : (
