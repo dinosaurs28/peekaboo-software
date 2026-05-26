@@ -123,6 +123,7 @@ export default function PrintLabelsPage() {
 
   const labels = Array.from({ length: labelsCount });
   const showMrp = prod.mrp != null;
+  const mrpValue = prod.mrp ?? prod.unitPrice;
   const mrpLineThrough = prod.mrp != null && prod.mrp > prod.unitPrice;
 
   return (
@@ -202,11 +203,7 @@ export default function PrintLabelsPage() {
               textOverflow: 'ellipsis',
               textAlign: 'left'
             }}>
-              {showMrp ? (
-                <span>
-                  MRP - ₹{prod!.mrp!.toFixed(0)}
-                </span>
-              ) : ''}
+              MRP - ₹{mrpValue.toFixed(0)}
             </div>
             <div style={{
               flex: '1 1 0',
