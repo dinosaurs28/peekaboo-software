@@ -1,4 +1,4 @@
-## Peekaboo POS – Launch Checklist and Roadmap
+## Peekaboo POS Software
 
 This file lists the final quick polishes to complete before build/launch, plus a roadmap of future additions that can follow without blocking go‑live.
 
