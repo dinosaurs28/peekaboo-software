@@ -107,9 +107,9 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
       return invRef.id;
     }
 
-  // Sequential invoice number (prefix + zero-padded counter) from Settings/app
-  const settingsRef = doc(dbx, COLLECTIONS.settings, 'app');
-  const settingsSnap = await tx.get(settingsRef);
+    // Sequential invoice number (prefix + zero-padded counter) from Settings/app
+    const settingsRef = doc(dbx, COLLECTIONS.settings, 'app');
+    const settingsSnap = await tx.get(settingsRef);
     let prefix = 'INV';
     let nextSeq = 1;
     if (settingsSnap.exists()) {
@@ -119,7 +119,9 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
     }
     const seqStr = String(nextSeq).padStart(6, '0');
     const invoiceNumber = `${prefix}-${seqStr}`;
+
     // Validate stock levels for all involved products (all reads must occur before any writes in a transaction)
+    const productSnapshots: Map<string, any> = new Map();
     for (const [productId, requested] of qtyByProduct.entries()) {
       const pRef = doc(dbx, COLLECTIONS.products, productId);
       const snap = await tx.get(pRef);
@@ -132,11 +134,25 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
         const name = typeof pdata?.name === 'string' ? pdata.name : 'Item';
         throw new Error(`Insufficient stock for ${name}. Available: ${current}, requested: ${requested}`);
       }
+      productSnapshots.set(productId, pdata);
+    }
+
+    // If loyalty is involved, read the customer before any writes
+    if (input.customerId) {
+      const cRef = doc(dbx, COLLECTIONS.customers, input.customerId);
+      const customerSnap = await tx.get(cRef);
+      if (!customerSnap.exists()) {
+        throw new Error('Customer not found for loyalty adjustment');
+      }
+      const currentPoints = Number(customerSnap.data()?.loyaltyPoints ?? 0);
+      if (Number(input.redeemedPoints ?? 0) > currentPoints) {
+        throw new Error('Insufficient loyalty points');
+      }
     }
 
     // From this point onwards, only writes
-  // Bump invoice counter
-  tx.set(settingsRef, { invoicePrefix: prefix, nextInvoiceSequence: nextSeq + 1, updatedAt: serverTimestamp() }, { merge: true });
+    // Bump invoice counter
+    tx.set(settingsRef, { invoicePrefix: prefix, nextInvoiceSequence: nextSeq + 1, updatedAt: serverTimestamp() }, { merge: true });
 
     // Decrement stock and create inventory logs per line (after validation)
     for (const l of input.lines) {
@@ -213,15 +229,7 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
     // Loyalty: adjust customer points and award new points if present
     if (input.customerId) {
       const cRef = doc(dbx, COLLECTIONS.customers, input.customerId);
-      const customerSnap = await tx.get(cRef);
-      if (!customerSnap.exists()) {
-        throw new Error("Customer not found for loyalty adjustment");
-      }
-      const currentPoints = Number(customerSnap.data()?.loyaltyPoints ?? 0);
       const redeemedPoints = Number(input.redeemedPoints ?? 0);
-      if (redeemedPoints > currentPoints) {
-        throw new Error("Insufficient loyalty points");
-      }
       const points = Math.floor(grandTotal / 100);
       const loyaltyDelta = (points > 0 ? points : 0) - (redeemedPoints > 0 ? redeemedPoints : 0);
       const customerPayload: any = {
