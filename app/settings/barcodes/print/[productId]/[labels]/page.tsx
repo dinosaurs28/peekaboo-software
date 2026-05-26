@@ -122,9 +122,7 @@ export default function PrintLabelsPage() {
   if (!prod) return <div className="p-6 text-sm">Preparing labels…</div>;
 
   const labels = Array.from({ length: labelsCount });
-  const showMrp = prod.mrp != null;
   const mrpValue = prod.mrp ?? prod.unitPrice;
-  const mrpLineThrough = prod.mrp != null && prod.mrp > prod.unitPrice;
 
   return (
     <div id="labels-print-root">

@@ -59,7 +59,7 @@ export default function BarcodeGeneratorPage() {
     () => products.find((p) => p.id === productId),
     [products, productId]
   );
-  const mrpLineThrough = selected?.mrp != null && selected.mrp > selected.unitPrice;
+  const mrpValue = selected?.mrp ?? selected?.unitPrice ?? 0;
 
   useEffect(() => {
     if (!selected) return;
@@ -175,16 +175,7 @@ export default function BarcodeGeneratorPage() {
                   {/* 4. Bottom: MRP (Left) & SKU (Right) */}
                   <div className="w-full flex items-end justify-between gap-2 mt-[1px]">
                     <div className="min-w-0 text-left text-[8px] leading-none text-gray-700">
-                      {selected.mrp != null ? (
-                        <span
-                          className="leading-none text-gray-700"
-                          style={{ textDecoration: mrpLineThrough ? 'line-through' : 'none' }}
-                        >
-                          MRP - ₹{selected.mrp.toFixed(0)}
-                        </span>
-                      ) : (
-                        <span className="text-transparent">MRP - ₹0</span>
-                      )}
+                      MRP - ₹{mrpValue?.toFixed(0)}
                     </div>
                     <div className="min-w-0 text-right text-[7px] leading-none font-mono truncate">
                       {encodeBarcode(selected, categories)}
@@ -205,7 +196,7 @@ export default function BarcodeGeneratorPage() {
               <p><strong>Top:</strong> Name</p>
               <p><strong>Below Name:</strong> SP - ₹Price</p>
               <p><strong>Middle:</strong> Barcode</p>
-              <p><strong>Bottom:</strong> MRP (Strikethrough) & SKU</p>
+              <p><strong>Bottom:</strong> MRP & SKU</p>
             </div>
           </div>
         </div>
