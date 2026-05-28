@@ -1,6 +1,6 @@
 "use client";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, orderBy, query, where, type DocumentData, type QuerySnapshot, type QueryConstraint, type FirestoreError } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, where, type DocumentData, type QuerySnapshot, type QueryConstraint, type FirestoreError, runTransaction, doc, serverTimestamp, increment } from "firebase/firestore";
 import type { InvoiceDoc } from "@/lib/models";
 import { COLLECTIONS } from "@/lib/models";
 
@@ -123,4 +123,78 @@ export function observeInvoices(cb: (invoices: InvoiceDoc[]) => void, filters?: 
   return () => {
     if (activeUnsub) activeUnsub();
   };
+}
+
+export async function deleteInvoice(invoiceId: string): Promise<void> {
+  if (!db) throw new Error("Firestore not initialized");
+  const dbx = db!;
+
+  await runTransaction(dbx, async (tx) => {
+    const invRef = doc(dbx, COLLECTIONS.invoices, invoiceId);
+    const invSnap = await tx.get(invRef);
+    if (!invSnap.exists()) throw new Error("Invoice not found");
+    const inv = invSnap.data() as any;
+
+    // Parse invoice sequence from invoiceNumber (expected format PREFIX-000123)
+    const invNum = String(inv.invoiceNumber || "");
+    const dash = invNum.lastIndexOf("-");
+    const seq = dash === -1 ? null : Number(invNum.slice(dash + 1));
+
+    const settingsRef = doc(dbx, COLLECTIONS.settings, 'app');
+    const settingsSnap = await tx.get(settingsRef);
+    const nextSeq = settingsSnap.exists() ? Number(settingsSnap.data()?.nextInvoiceSequence ?? 1) : 1;
+
+    // Read involved product docs and customer (reads must be before writes)
+    const items: Array<any> = Array.isArray(inv.items) ? inv.items : [];
+    for (const it of items) {
+      const pRef = doc(dbx, COLLECTIONS.products, String(it.productId));
+      await tx.get(pRef);
+    }
+    if (inv.customerId) {
+      const cRef = doc(dbx, COLLECTIONS.customers, String(inv.customerId));
+      await tx.get(cRef);
+    }
+
+    // Now perform writes: restore stock, add adjustment logs, adjust customer, delete invoice, update next sequence
+    for (const it of items) {
+      const pRef = doc(dbx, COLLECTIONS.products, String(it.productId));
+      const qty = Number(it.quantity || 0);
+      if (qty !== 0) {
+        tx.update(pRef, { stock: increment(qty), updatedAt: serverTimestamp() });
+      }
+      const logRef = doc(collection(dbx, COLLECTIONS.inventoryLogs));
+      tx.set(logRef, {
+        productId: String(it.productId),
+        quantityChange: qty,
+        type: 'adjustment',
+        reason: 'invoice-delete',
+        relatedInvoiceId: invRef.id,
+        userId: inv.cashierUserId ?? null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    // Adjust customer totals/points if present
+    if (inv.customerId) {
+      const cRef = doc(dbx, COLLECTIONS.customers, String(inv.customerId));
+      const redeemedPoints = Number(inv.redeemedPoints ?? 0);
+      const earnedPoints = Number(inv.loyaltyPointsEarned ?? 0);
+      const loyaltyDelta = earnedPoints - redeemedPoints;
+      const grand = Number(inv.grandTotal ?? 0) || 0;
+      const customerPayload: any = { updatedAt: serverTimestamp(), totalSpend: increment(-grand) };
+      if (loyaltyDelta !== 0) customerPayload.loyaltyPoints = increment(-loyaltyDelta);
+      tx.set(cRef, customerPayload, { merge: true });
+    }
+
+    // Delete invoice doc
+    tx.delete(invRef);
+
+    // If the deleted invoice was the latest issued (nextSeq === seq + 1), roll back nextInvoiceSequence
+    if (seq !== null && settingsSnap.exists()) {
+      if (nextSeq === seq + 1) {
+        tx.set(settingsRef, { nextInvoiceSequence: seq, updatedAt: serverTimestamp() }, { merge: true });
+      }
+    }
+  });
 }

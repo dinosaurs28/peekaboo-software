@@ -15,6 +15,8 @@ import { splitInclusive } from "@/lib/tax";
 import { FaArrowLeft } from "react-icons/fa";
 import { IoMdPrint } from "react-icons/io";
 import { RiExchangeLine } from "react-icons/ri";
+import { useToast } from "@/components/ui/toast";
+import { deleteInvoice } from "@/lib/invoices";
 
 export default function InvoiceDetailsPage() {
   const { user, role, loading } = useAuth();
@@ -113,6 +115,20 @@ export default function InvoiceDetailsPage() {
 
   // Allow printing for both Admin and Cashier roles
   const canPrint = role === "admin" || role === "cashier";
+  const { toast } = useToast();
+
+  async function handleDelete() {
+    if (!invoice?.id) return;
+    if (!confirm(`Delete invoice ${invoice.invoiceNumber || invoice.id}? This will restore stock and adjust customer points.`)) return;
+    try {
+      await deleteInvoice(invoice.id);
+      toast({ title: 'Invoice deleted', description: `Invoice ${invoice.invoiceNumber} removed`, variant: 'success' });
+      window.location.href = '/invoices';
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ title: 'Failed to delete invoice', description: msg, variant: 'destructive' });
+    }
+  }
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
@@ -146,6 +162,17 @@ export default function InvoiceDetailsPage() {
                     <IoMdPrint className="h-6 w-6" />
                   </Button>
                 </>
+              )}
+              {/* Delete allowed for cashier and admin */}
+              {(role === 'admin' || role === 'cashier') && (
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  className="ml-2"
+                  disabled={!invoice}
+                >
+                  Delete
+                </Button>
               )}
               <Button
                 variant="secondary"
