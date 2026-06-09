@@ -63,7 +63,13 @@ export default function PrintLabelsPage() {
     } as const;
 
     let drawn = 0;
-    svgRefs.current.forEach((el) => { if (el) { JsBarcode(el, codeText, opts as any); drawn++; } });
+    svgRefs.current.forEach((el) => {
+      if (el) {
+        JsBarcode(el, codeText, opts as any);
+        el.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        drawn++;
+      }
+    });
     if (drawn > 0) {
       requestAnimationFrame(() => setBarcodesReady(true));
     }
@@ -74,16 +80,11 @@ export default function PrintLabelsPage() {
     style.innerHTML = `
       @media print {
         @page { size: 50mm 25mm landscape; margin: 0; }
-        html, body { margin: 0; padding: 0; }
-        body * { visibility: hidden !important; }
-        #labels-print-root, #labels-print-root * { visibility: visible !important; }
-        #labels-print-root { position: absolute; top: 0; left: 0; width: 50mm; margin: 0; padding: 0; }
+        html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
+        body > *:not(#labels-print-root) { display: none !important; }
+        #labels-print-root { margin: 0; padding: 0; background: white; }
         #labels-print-root svg { shape-rendering: crispEdges !important; text-rendering: geometricPrecision !important; }
         #labels-print-root svg path, #labels-print-root svg rect { shape-rendering: crispEdges !important; }
-        #labels-print-root > div {
-          page-break-inside: avoid;
-          break-inside: avoid;
-        }
         #labels-print-root > div:not(:last-child) {
           page-break-after: always;
           break-after: page;
@@ -138,8 +139,6 @@ export default function PrintLabelsPage() {
             alignItems: 'center',
             justifyContent: 'space-between',
             overflow: 'hidden',
-            breakInside: 'avoid',
-            pageBreakInside: 'avoid',
           }}
         >
           {/* 1. Name */}
