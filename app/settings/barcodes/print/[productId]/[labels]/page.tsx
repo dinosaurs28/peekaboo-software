@@ -58,8 +58,8 @@ export default function PrintLabelsPage() {
       format: "CODE128B",
       displayValue: false,
       margin: 2,
-      height: 28,
-      width: 2
+      height: 38,
+      width: 1.5
     } as const;
 
     let drawn = 0;
@@ -73,7 +73,7 @@ export default function PrintLabelsPage() {
     const style = document.createElement('style');
     style.innerHTML = `
       @media print {
-        @page { size: 50mm 25mm; margin: 0; }
+        @page { size: 50mm 25mm landscape; margin: 0; }
         html, body { margin: 0; padding: 0; }
         body * { visibility: hidden !important; }
         #labels-print-root, #labels-print-root * { visibility: visible !important; }
@@ -175,7 +175,7 @@ export default function PrintLabelsPage() {
             justifyContent: 'center',
             overflow: 'hidden'
           }}>
-            <svg ref={(el) => { svgRefs.current[idx] = el; }} style={{ width: '100%', height: 'auto', display: 'block' }} />
+            <svg ref={(el) => { svgRefs.current[idx] = el; }} style={{ width: '100%', display: 'block' }} />
           </div>
 
           {/* 4. MRP & SKU */}
