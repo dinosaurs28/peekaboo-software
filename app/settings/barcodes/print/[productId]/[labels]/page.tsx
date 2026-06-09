@@ -57,9 +57,9 @@ export default function PrintLabelsPage() {
     const opts = {
       format: "CODE128B",
       displayValue: false,
-      margin: 4,
-      height: 30,
-      width: 1.6
+      margin: 2,
+      height: 28,
+      width: 2
     } as const;
 
     let drawn = 0;
@@ -73,22 +73,20 @@ export default function PrintLabelsPage() {
     const style = document.createElement('style');
     style.innerHTML = `
       @media print {
-        @page { size: 50mm 25mm landscape; margin: 0; }
-        html, body { width: 50mm; height: 25mm; margin: 0; padding: 0; }
+        @page { size: 50mm 25mm; margin: 0; }
+        html, body { margin: 0; padding: 0; }
         body * { visibility: hidden !important; }
         #labels-print-root, #labels-print-root * { visibility: visible !important; }
-        #labels-print-root { position: absolute; inset: 0; margin: 0; padding: 0; }
+        #labels-print-root { position: absolute; top: 0; left: 0; width: 50mm; margin: 0; padding: 0; }
         #labels-print-root svg { shape-rendering: crispEdges !important; text-rendering: geometricPrecision !important; }
         #labels-print-root svg path, #labels-print-root svg rect { shape-rendering: crispEdges !important; }
         #labels-print-root > div {
-          page-break-after: always;
-          break-after: page;
           page-break-inside: avoid;
           break-inside: avoid;
         }
-        #labels-print-root > div:last-child {
-          page-break-after: auto;
-          break-after: auto;
+        #labels-print-root > div:not(:last-child) {
+          page-break-after: always;
+          break-after: page;
         }
       }
       #labels-print-root { background: #fff; }
@@ -132,10 +130,9 @@ export default function PrintLabelsPage() {
           className="mx-auto"
           style={{
             width: '50mm',
-            minHeight: '25mm',
+            height: '25mm',
             padding: '1mm',
             boxSizing: 'border-box',
-            pageBreakAfter: idx < labelsCount - 1 ? 'always' : 'auto',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -178,7 +175,7 @@ export default function PrintLabelsPage() {
             justifyContent: 'center',
             overflow: 'hidden'
           }}>
-            <svg ref={(el) => { svgRefs.current[idx] = el; }} style={{ width: '90%', height: '100%' }} />
+            <svg ref={(el) => { svgRefs.current[idx] = el; }} style={{ width: '100%', height: 'auto', display: 'block' }} />
           </div>
 
           {/* 4. MRP & SKU */}
