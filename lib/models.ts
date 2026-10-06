@@ -49,7 +49,8 @@ export interface InvoiceLineItem {
   productId: string;
   name: string;
   quantity: number;
-  unitPrice: number; // price at time of sale
+  unitPrice: number; // selling price (SP) at time of sale
+  mrp?: number; // MRP per unit at time of sale (snapshot; absent on older invoices)
   taxRatePct?: number;
   discountAmount?: number; // absolute amount per line
 }

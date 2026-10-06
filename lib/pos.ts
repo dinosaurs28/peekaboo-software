@@ -5,7 +5,7 @@ import type { InvoiceDoc } from "@/lib/models";
 import { COLLECTIONS, GoodsReceiptDoc, GoodsReceiptLine } from "@/lib/models";
 
 export type CheckoutInput = {
-  lines: Array<{ productId: string; name: string; qty: number; unitPrice: number; lineDiscount?: number }>;
+  lines: Array<{ productId: string; name: string; qty: number; unitPrice: number; mrp?: number; lineDiscount?: number; taxRatePct?: number }>;
   billDiscount?: number;
   redeemedPoints?: number;
   redeemedValue?: number;
@@ -180,6 +180,7 @@ export async function checkoutCart(input: CheckoutInput): Promise<string> {
         name: l.name,
         quantity: l.qty,
         unitPrice: l.unitPrice,
+        ...(Number.isFinite(l.mrp) && (l.mrp as number) > 0 ? { mrp: l.mrp } : {}),
         taxRatePct: (l as any).taxRatePct || undefined,
         discountAmount: l.lineDiscount ?? 0,
       })),

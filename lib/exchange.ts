@@ -174,7 +174,7 @@ export async function performExchange(req: ExchangeRequest): Promise<{ exchangeI
 
     // New invoice if there are new items
     if (newLines.length > 0) {
-      const itemsForInvoice = newLines.map(n => ({ productId: n.productId, name: pmap.get(n.productId)?.name || '', quantity: n.qty, unitPrice: n.unitPrice, taxRatePct: pmap.get(n.productId)?.taxRatePct, discountAmount: 0 }));
+      const itemsForInvoice = newLines.map(n => ({ productId: n.productId, name: pmap.get(n.productId)?.name || '', quantity: n.qty, unitPrice: n.unitPrice, ...(Number(pmap.get(n.productId)?.mrp) > 0 ? { mrp: pmap.get(n.productId)!.mrp } : {}), taxRatePct: pmap.get(n.productId)?.taxRatePct, discountAmount: 0 }));
       const discountTotal = Math.max(0, Math.min(returnCredit, newSubtotal));
       const subtotal = newSubtotal;
       const taxTotal = 0;

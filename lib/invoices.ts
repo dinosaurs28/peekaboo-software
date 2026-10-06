@@ -33,6 +33,7 @@ export function toInvoiceDoc(id: string, data: Record<string, unknown>): Invoice
       name: asString(it.name),
       quantity: asNumber(it.quantity, 0),
       unitPrice: asNumber(it.unitPrice, 0),
+      mrp: it.mrp != null ? asNumber(it.mrp) : undefined,
       taxRatePct: it.taxRatePct != null ? asNumber(it.taxRatePct) : undefined,
       discountAmount: it.discountAmount != null ? asNumber(it.discountAmount) : undefined,
     })) : [],

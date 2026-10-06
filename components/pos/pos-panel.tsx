@@ -396,7 +396,7 @@ export function PosPanel() {
     if (!product && !navigator.onLine) {
       const cached = await findCachedBySKU(sku);
       if (cached) {
-        product = { id: cached.id, name: cached.name, sku: cached.sku, unitPrice: cached.unitPrice, category: cached.category, taxRatePct: cached.taxRatePct, active: true, stock: 0, createdAt: '', updatedAt: '' } as any;
+        product = { id: cached.id, name: cached.name, sku: cached.sku, unitPrice: cached.unitPrice, mrp: cached.mrp, category: cached.category, taxRatePct: cached.taxRatePct, active: true, stock: 0, createdAt: '', updatedAt: '' } as any;
       }
     }
     if (!product) {
@@ -659,7 +659,7 @@ export function PosPanel() {
         try {
           const id = `op-${Date.now()}`;
           const payload = {
-            lines: cart.map((l) => ({ productId: l.product.id!, name: l.product.name, qty: l.qty, unitPrice: l.product.unitPrice, lineDiscount: lineDiscount(l), taxRatePct: l.product.taxRatePct })),
+            lines: cart.map((l) => ({ productId: l.product.id!, name: l.product.name, qty: l.qty, unitPrice: l.product.unitPrice, mrp: l.product.mrp, lineDiscount: lineDiscount(l), taxRatePct: l.product.taxRatePct })),
             billDiscount: billDiscComputed,
             redeemedPoints: redeemedPoints > 0 ? redeemedPoints : undefined,
             redeemedValue: redeemedPoints > 0 ? redeemedPoints * LOYALTY_POINT_VALUE : undefined,
@@ -684,6 +684,7 @@ export function PosPanel() {
             name: l.product.name,
             qty: l.qty,
             unitPrice: l.product.unitPrice,
+            mrp: l.product.mrp,
             lineDiscount: lineDiscount(l),
             // pass tax rate if present for GST calc
             taxRatePct: l.product.taxRatePct,

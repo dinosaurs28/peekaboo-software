@@ -7,6 +7,7 @@ type CachedProduct = {
   name: string;
   sku: string;
   unitPrice: number;
+  mrp?: number;
   category?: string;
   taxRatePct?: number;
 };
@@ -39,7 +40,7 @@ export async function saveProductsToCache(products: ProductDoc[]): Promise<void>
     const store = tx.objectStore(STORE);
     products.forEach((p) => {
       if (!p.id) return;
-      const cp: CachedProduct = { id: p.id, name: p.name, sku: p.sku, unitPrice: p.unitPrice, category: p.category, taxRatePct: p.taxRatePct };
+      const cp: CachedProduct = { id: p.id, name: p.name, sku: p.sku, unitPrice: p.unitPrice, mrp: p.mrp, category: p.category, taxRatePct: p.taxRatePct };
       store.put(cp);
     });
     tx.oncomplete = () => resolve();
