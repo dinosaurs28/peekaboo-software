@@ -174,7 +174,7 @@ export default function BarcodeGeneratorPage() {
 
                   {/* 4. Bottom: MRP (Left) & SKU (Right) */}
                   <div className="w-full flex items-end justify-between gap-2 mt-[1px]">
-                    <div className="min-w-0 text-left text-[8px] leading-none text-gray-700">
+                    <div className="min-w-0 text-left text-[9px] leading-none font-extrabold text-black">
                       MRP - ₹{mrpValue?.toFixed(0)}
                     </div>
                     <div className="min-w-0 text-right text-[7px] leading-none font-mono truncate">

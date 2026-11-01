@@ -7,14 +7,13 @@ export type ReceiptLine = {
   name: string;
   qty: number;
   sp: number; // selling price per unit (tax-inclusive)
-  mrp?: number; // MRP per unit; absent on invoices saved before MRP was recorded
+  mrp?: number; // MRP per unit; callers fall back to the product's MRP, then SP
   lineDiscount?: number; // per-item discount given by the cashier during billing (absolute)
   taxRatePct?: number;
 };
 
 type ComputedLine = ReceiptLine & {
   mrpUnit: number; // effective MRP per unit (never below SP)
-  hasMrp: boolean;
   mrpGross: number; // mrpUnit * qty (shown for reference only)
   spGross: number; // sp * qty
   discount: number; // per-item billing discount only; MRP vs SP is not a discount
@@ -25,12 +24,11 @@ function computeLine(l: ReceiptLine): ComputedLine {
   const qty = Number(l.qty) || 0;
   const sp = Number(l.sp) || 0;
   const rawMrp = Number(l.mrp);
-  const hasMrp = Number.isFinite(rawMrp) && rawMrp > 0;
-  // MRP is always above SP; anything else is bad data, so fall back to SP.
-  const mrpUnit = hasMrp ? Math.max(rawMrp, sp) : sp;
+  // MRP is always above SP; missing or lower values are bad data, so fall back to SP.
+  const mrpUnit = Number.isFinite(rawMrp) && rawMrp > 0 ? Math.max(rawMrp, sp) : sp;
   const discount = Number(l.lineDiscount || 0);
   const spGross = sp * qty;
-  return { ...l, qty, sp, mrpUnit, hasMrp, mrpGross: mrpUnit * qty, spGross, discount, net: spGross - discount };
+  return { ...l, qty, sp, mrpUnit, mrpGross: mrpUnit * qty, spGross, discount, net: spGross - discount };
 }
 
 const fmt = (n: number) => n.toFixed(2);
@@ -49,18 +47,15 @@ export function ReceiptItems({ lines }: { lines: ReceiptLine[] }) {
           <div key={idx} className="flex flex-col">
             <div className="font-bold text-sm leading-tight mb-0.5">{it.name}</div>
 
-            {/* SP sits directly above MRP. The amount column is SP-based;
-                MRP is printed for reference only. */}
+            {/* Order per item: MRP, then SP, then the cashier's item discount, then net. */}
+            <div className="flex justify-between text-xs text-gray-700">
+              <span>MRP : {it.qty} x {fmt(it.mrpUnit)}</span>
+              <span>{fmt(it.mrpGross)}</span>
+            </div>
             <div className="flex justify-between text-xs text-gray-700">
               <span>SP&nbsp;&nbsp;: {it.qty} x {fmt(it.sp)}</span>
               <span>{fmt(it.spGross)}</span>
             </div>
-            {it.hasMrp && (
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>MRP: {it.qty} x {fmt(it.mrpUnit)}</span>
-                <span>({fmt(it.mrpGross)})</span>
-              </div>
-            )}
 
             {it.discount > 0.004 && (
               <div className="flex justify-between text-xs text-gray-500 italic">
@@ -127,12 +122,10 @@ export function ReceiptTotals({
 
   return (
     <div className="mt-2 text-xs flex flex-col gap-1">
-      {t.mrp > t.sp && (
-        <div className="flex justify-between text-gray-500">
-          <span>Total MRP</span>
-          <span>({fmt(t.mrp)})</span>
-        </div>
-      )}
+      <div className="flex justify-between text-gray-600">
+        <span>Total MRP</span>
+        <span>{fmt(t.mrp)}</span>
+      </div>
       <div className="flex justify-between text-gray-600">
         <span>Subtotal (SP)</span>
         <span>{fmt(t.sp)}</span>

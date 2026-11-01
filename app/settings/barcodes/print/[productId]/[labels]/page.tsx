@@ -220,7 +220,7 @@ export default function PrintLabelsPage() {
               lineHeight: `${FOOTER_ROW_MM}mm`,
               overflow: 'hidden',
             }}>
-              <span style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+              <span style={{ flexShrink: 0, whiteSpace: 'nowrap', fontSize: '7pt', fontWeight: 800, color: '#000' }}>
                 MRP - ₹{mrpValue.toFixed(0)}
               </span>
               <span style={{

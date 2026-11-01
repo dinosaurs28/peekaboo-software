@@ -5,6 +5,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import type { InvoiceDoc, SettingsDoc } from "@/lib/models";
 import { toInvoiceDoc } from "@/lib/invoices";
+import { getProduct } from "@/lib/products";
 import Receipt from "@/components/receipt";
 import { ReceiptItems, ReceiptTotals, type ReceiptLine } from "@/components/receipt-lines";
 
@@ -14,12 +15,28 @@ export default function InvoiceReceiptPage() {
   const search = useSearchParams();
   const [inv, setInv] = useState<InvoiceDoc | null>(null);
   const [settings, setSettings] = useState<Partial<SettingsDoc> | null>(null);
+  // MRP per productId for lines saved without an MRP snapshot (older invoices)
+  const [productMrp, setProductMrp] = useState<Record<string, number>>({});
 
   useEffect(() => {
     (async () => {
       if (!db || !id) return;
       const snap = await getDoc(doc(db, "Invoices", id));
-      if (snap.exists()) setInv(toInvoiceDoc(snap.id, snap.data() as any));
+      if (snap.exists()) {
+        const invoice = toInvoiceDoc(snap.id, snap.data() as any);
+        setInv(invoice);
+        const missing = Array.from(new Set(invoice.items.filter((it) => !(Number(it.mrp) > 0) && it.productId).map((it) => it.productId)));
+        if (missing.length) {
+          const found: Record<string, number> = {};
+          await Promise.all(missing.map(async (pid) => {
+            try {
+              const p = await getProduct(pid);
+              if (p && Number(p.mrp) > 0) found[pid] = Number(p.mrp);
+            } catch { /* fall back to SP */ }
+          }));
+          setProductMrp(found);
+        }
+      }
       try {
         const sSnap = await getDoc(doc(db, "Settings", "app"));
         if (sSnap.exists()) setSettings(sSnap.data() as any);
@@ -45,11 +62,11 @@ export default function InvoiceReceiptPage() {
       name: it.name,
       qty: it.quantity,
       sp: it.unitPrice,
-      mrp: it.mrp,
+      mrp: Number(it.mrp) > 0 ? it.mrp : productMrp[it.productId],
       lineDiscount: it.discountAmount,
       taxRatePct: it.taxRatePct,
     })),
-    [inv]
+    [inv, productMrp]
   );
 
   if (!inv) return <div className="p-4">Preparing…</div>;
