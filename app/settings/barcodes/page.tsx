@@ -1,30 +1,17 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import JsBarcode from "jsbarcode";
 import { listProducts } from "@/lib/products";
 import type { ProductDoc } from "@/lib/models";
-import { categoryCode } from "@/lib/models";
 import { listCategories } from "@/lib/categories";
 import type { CategoryDoc } from "@/lib/models";
 import { useToast } from "@/components/ui/toast";
 import { IoArrowBack } from "react-icons/io5";
-
-function encodeBarcode(p: ProductDoc, categories: CategoryDoc[]): string {
-  const catName = p.category;
-  let code = categoryCode(catName);
-  if (catName) {
-    const match = categories.find(
-      (c) => c.active && c.name.toLowerCase() === catName.toLowerCase()
-    );
-    if (match?.code) code = match.code.toUpperCase();
-  }
-  return `PB|${code}|${p.sku}`;
-}
+import { BarcodeLabel, encodeBarcode, loadLabelOffset, saveLabelOffset, type LabelOffset } from "@/components/barcode-label";
 
 export default function BarcodeGeneratorPage() {
   const { user, role, loading } = useAuth();
@@ -32,7 +19,13 @@ export default function BarcodeGeneratorPage() {
   const [products, setProducts] = useState<ProductDoc[]>([]);
   const [productId, setProductId] = useState<string>("");
   const [qty, setQty] = useState<number>(1);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [offset, setOffset] = useState<LabelOffset>({ x: 0, y: 0 });
+  useEffect(() => { setOffset(loadLabelOffset()); }, []);
+  function updateOffset(axis: "x" | "y", v: number) {
+    const next = { ...offset, [axis]: Math.max(-5, Math.min(5, Number.isFinite(v) ? v : 0)) };
+    setOffset(next);
+    saveLabelOffset(next);
+  }
   const [categories, setCategories] = useState<CategoryDoc[]>([]);
   const { toast } = useToast();
 
@@ -59,25 +52,7 @@ export default function BarcodeGeneratorPage() {
     () => products.find((p) => p.id === productId),
     [products, productId]
   );
-  const mrpValue = selected?.mrp ?? selected?.unitPrice ?? 0;
-
-  useEffect(() => {
-    if (!selected) return;
-    const code = encodeBarcode(selected, categories);
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    try {
-      JsBarcode(canvas, code, {
-        format: "CODE128B",
-        displayValue: false,
-        margin: 4,
-        height: 35,
-        width: 1.6
-      });
-    } catch (e) {
-      console.error("Barcode render failed", e);
-    }
-  }, [selected, qty, categories]);
+  const codeText = useMemo(() => (selected ? encodeBarcode(selected, categories) : ""), [selected, categories]);
 
   function printLabels() {
     if (!selected) return;
@@ -150,38 +125,7 @@ export default function BarcodeGeneratorPage() {
             {/* PREVIEW CONTAINER */}
             <div className="border rounded-md p-4 flex flex-col items-center justify-center bg-gray-50">
               {selected ? (
-                <div
-                  className="bg-white border shadow-sm flex flex-col items-center text-center overflow-hidden relative"
-                  style={{ width: "50mm", height: "25mm", padding: "1mm" }}
-                >
-                  {/* 1. Name */}
-                  <div className="text-[10px] font-bold leading-tight w-full truncate mb-[1px]">
-                    {selected.name}
-                  </div>
-
-                  {/* 2. Selling Price (Below Name) */}
-                  <div className="min-w-0 text-left text-[9px] leading-none font-extrabold text-black">
-                      MRP - ₹{mrpValue?.toFixed(0)}
-                    </div>
-
-                  {/* 3. Barcode (Middle) */}
-                  <div className="flex-1 w-full flex items-center justify-center overflow-hidden">
-                    <canvas
-                      ref={canvasRef}
-                      style={{ height: "100%", maxWidth: "100%" }}
-                    />
-                  </div>
-
-                  {/* 4. Bottom: MRP (Left) & SKU (Right) */}
-                  <div className="w-full flex items-end justify-between gap-2 mt-[1px]">
-                    <div className="text-sm font-extrabold leading-none mb-[2px]">
-                    SP - ₹{selected.unitPrice.toFixed(0)}
-                  </div>
-                    <div className="min-w-0 text-right text-[7px] leading-none font-mono truncate">
-                      {encodeBarcode(selected, categories)}
-                    </div>
-                  </div>
-                </div>
+                <BarcodeLabel product={selected} code={codeText} className="border shadow-sm" />
               ) : (
                 <div className="text-xs text-muted-foreground">
                   Select a product to preview
@@ -192,11 +136,26 @@ export default function BarcodeGeneratorPage() {
           <div>
             <div className="text-sm font-medium mb-2">Layout</div>
             <div className="text-xs text-muted-foreground space-y-1">
-              <p>Label size: 50×25 mm.</p>
+              <p>Label size: 50×25 mm (content area 47×23 mm). The print uses this exact layout.</p>
               <p><strong>Top:</strong> Name</p>
-              <p><strong>Below Name:</strong> SP - ₹Price</p>
+              <p><strong>Below Name:</strong> MRP - ₹Price (bold)</p>
               <p><strong>Middle:</strong> Barcode</p>
-              <p><strong>Bottom:</strong> MRP & SKU</p>
+              <p><strong>Bottom:</strong> SP & code</p>
+            </div>
+
+            <div className="text-sm font-medium mt-4 mb-2">Print alignment (this printer)</div>
+            <p className="text-xs text-muted-foreground mb-2">
+              If the printed label sits off-centre, nudge it here. Negative X moves it left, negative Y moves it up. Saved on this computer.
+            </p>
+            <div className="flex gap-3">
+              <label className="text-xs">
+                X (mm)
+                <Input type="number" step={0.1} min={-5} max={5} value={offset.x} onChange={(e) => updateOffset("x", Number(e.target.value))} className="w-24" />
+              </label>
+              <label className="text-xs">
+                Y (mm)
+                <Input type="number" step={0.1} min={-5} max={5} value={offset.y} onChange={(e) => updateOffset("y", Number(e.target.value))} className="w-24" />
+              </label>
             </div>
           </div>
         </div>
