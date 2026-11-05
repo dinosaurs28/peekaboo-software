@@ -160,9 +160,9 @@ export default function BarcodeGeneratorPage() {
                   </div>
 
                   {/* 2. Selling Price (Below Name) */}
-                  <div className="text-sm font-extrabold leading-none mb-[2px]">
-                    SP - ₹{selected.unitPrice.toFixed(0)}
-                  </div>
+                  <div className="min-w-0 text-left text-[9px] leading-none font-extrabold text-black">
+                      MRP - ₹{mrpValue?.toFixed(0)}
+                    </div>
 
                   {/* 3. Barcode (Middle) */}
                   <div className="flex-1 w-full flex items-center justify-center overflow-hidden">
@@ -174,9 +174,9 @@ export default function BarcodeGeneratorPage() {
 
                   {/* 4. Bottom: MRP (Left) & SKU (Right) */}
                   <div className="w-full flex items-end justify-between gap-2 mt-[1px]">
-                    <div className="min-w-0 text-left text-[9px] leading-none font-extrabold text-black">
-                      MRP - ₹{mrpValue?.toFixed(0)}
-                    </div>
+                    <div className="text-sm font-extrabold leading-none mb-[2px]">
+                    SP - ₹{selected.unitPrice.toFixed(0)}
+                  </div>
                     <div className="min-w-0 text-right text-[7px] leading-none font-mono truncate">
                       {encodeBarcode(selected, categories)}
                     </div>
